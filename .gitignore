@@ -1,0 +1,14 @@
+# python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# tooling
+.vscode/
+.idea/
+*.log
+
+# local scratch
+docs/raw/
