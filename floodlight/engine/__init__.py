@@ -1,0 +1,1 @@
+"""The FLOODLIGHT pipeline: LISTEN → EXPECT → COMPARE → WARN."""
