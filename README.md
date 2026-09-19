@@ -8,10 +8,22 @@
 </p>
 
 <p align="center">
-  <img alt="python" src="https://img.shields.io/badge/python-3.11+-3fd0ff?style=flat-square&labelColor=0c0f22" />
-  <img alt="fastapi" src="https://img.shields.io/badge/FastAPI-SSE%20live%20stream-a96bf8?style=flat-square&labelColor=0c0f22" />
-  <img alt="tests" src="https://img.shields.io/badge/tests-11%20passing-2bd576?style=flat-square&labelColor=0c0f22" />
-  <img alt="license" src="https://img.shields.io/badge/license-MIT-e2afff?style=flat-square&labelColor=0c0f22" />
+  <img alt="python" src="https://img.shields.io/badge/python-3.11+-4fc1d4?style=flat-square&labelColor=0b0d0f" />
+  <img alt="fastapi" src="https://img.shields.io/badge/fastapi-SSE%20stream-e8eae6?style=flat-square&labelColor=0b0d0f" />
+  <img alt="tests" src="https://img.shields.io/badge/tests-18%20green-2bd576?style=flat-square&labelColor=0b0d0f" />
+  <img alt="alerts" src="https://img.shields.io/badge/alerts-मर%20·%20हि%20·%20EN-e0a83c?style=flat-square&labelColor=0b0d0f" />
+  <img alt="license" src="https://img.shields.io/badge/license-MIT-9aa3a7?style=flat-square&labelColor=0b0d0f" />
+</p>
+
+<p align="center">
+  <sub>
+    <a href="#quickstart">quickstart</a> ·
+    <a href="#the-twist-in-one-diagram">the twist</a> ·
+    <a href="#how-it-works">how it works</a> ·
+    <a href="#beyond-the-replay--already-wired">beyond the replay</a> ·
+    <a href="#deploy-give-judges-a-url">deploy</a> ·
+    <a href="#design-language">design</a>
+  </sub>
 </p>
 
 ---
@@ -30,7 +42,8 @@ FLOODLIGHT is a ward-level flood nervous system that answers both halves of that
   water beats the model, the cause is underground: the drain's health score drops and the ward war room gets a
   dispatch card with the evidence attached.
 
-<p align="center"><img src="docs/screenshots/war-room.png" alt="FLOODLIGHT ward war room at peak storm" width="900" /></p>
+<p align="center"><img src="docs/screenshots/war-room.png" alt="FLOODLIGHT ward instrument at peak storm" width="920" /></p>
+<p align="center"><sub>15:45, peak cloudburst — 11 streets red, the blocked drain dashed amber, a street's diagnosis card open. Calm by default; every detail is one tap away.</sub></p>
 
 ## The twist, in one diagram
 
@@ -84,10 +97,16 @@ photos carry their **CV depth-band tags**), Rainfall for the gauge chart, Map ke
 File your own citizen report from the composer (bottom-right) while the storm runs — the engine ingests it on
 the next window exactly like the scripted WhatsApp traffic.
 
-<p align="center">
-  <img src="docs/screenshots/dispatch.png" alt="Cause B dispatch card with evidence" width="430" />
-  <img src="docs/screenshots/alerts.png" alt="Trilingual street alerts with lead time" width="430" />
-</p>
+<table align="center">
+  <tr>
+    <td align="center"><img src="docs/screenshots/diagnosis.png" alt="Tap-to-reveal street diagnosis" width="440" /><br/><sub><b>Tap a street →</b> its diagnosis, in plain language</sub></td>
+    <td align="center"><img src="docs/screenshots/quiet.png" alt="Quiet day: zero alerts sent" width="440" /><br/><sub><b>The negative case:</b> a normal day sends zero alerts — drain still caught</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/dispatch.png" alt="Cause B dispatch card with evidence" width="440" /><br/><sub><b>Cause B →</b> crew dispatched with photo evidence, minute 30</sub></td>
+    <td align="center"><img src="docs/screenshots/alerts.png" alt="Trilingual street alerts with lead time" width="440" /><br/><sub><b>Cause A →</b> trilingual alerts with a T−30 min head start</sub></td>
+  </tr>
+</table>
 
 ## How it works
 
@@ -126,6 +145,20 @@ The app is a single uvicorn process with no database — free tiers eat it happi
 [`render.yaml`](render.yaml) and a `Procfile` are included: connect this repo on
 [Render](https://render.com) (or Railway/Fly), and the start command is
 `uvicorn floodlight.app:app --host 0.0.0.0 --port $PORT`.
+
+## Design language
+
+The dashboard is styled as a **hydrological instrument**, not a SaaS page — Bloomberg-terminal and
+mission-control DNA:
+
+- graphite surfaces split by **hairline rules** — no decorated cards, no glows
+- **IBM Plex Sans + Plex Mono** with tabular numerals; Anton only for the wordmark
+- one working accent (**instrument teal**); **amber and vermillion appear only as status semantics**
+  (watch · alert · blocked · dispatched)
+- **cased cartographic strokes** on the map — dark casing under a solid colour fill, the way
+  professional GIS tools draw roads; the blocked drain marches amber dashes because that *is* signal
+- **progressive disclosure** — a plain-language status line and four numbers by default; the street
+  diagnosis, the raw feed, the gauge chart and the report composer all open on demand
 
 ## Honest data notes
 
