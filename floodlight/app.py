@@ -129,6 +129,13 @@ app = FastAPI(title="FLOODLIGHT", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 
+@app.get("/healthz")
+async def healthz() -> JSONResponse:
+    """Deploy health probe (Render/Railway point here)."""
+    return JSONResponse({"ok": True, "service": "floodlight",
+                         "storm": hub.replay.storm_id, "finished": hub.replay.finished})
+
+
 @app.get("/")
 async def index() -> FileResponse:
     # The shell must never be cached against a newer app.js/style.css.
