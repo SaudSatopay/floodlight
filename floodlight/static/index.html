@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FLOODLIGHT · Ward War Room</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=JetBrains+Mono:ital,wght@0,400;0,700;1,400&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header id="topbar">
+    <div class="brand">
+      <span class="logo"><b>FLOOD</b><i>LIGHT</i></span>
+      <span class="tag">WARD WAR ROOM · HINDMATA–PAREL PILOT · CX0404</span>
+    </div>
+    <div class="storm-meta">
+      <div class="chip mono" id="storm-name">—</div>
+    </div>
+    <div class="clockbox">
+      <div class="clock mono" id="clock">14:00</div>
+      <div class="clock-sub mono" id="clock-sub">storm replay · paused</div>
+    </div>
+    <div class="gauges">
+      <div class="gauge">
+        <div class="g-label mono">RAIN / 15 MIN</div>
+        <div class="g-value mono" id="rain-now">0 <small>mm</small></div>
+      </div>
+      <div class="gauge">
+        <div class="g-label mono">TIDE</div>
+        <div class="g-value mono" id="tide-now">1.9 <small>m</small></div>
+        <div class="g-bar"><div id="tide-lock-bar"></div></div>
+        <div class="g-label mono" id="tide-lock-label">outfalls open</div>
+      </div>
+    </div>
+    <div class="controls">
+      <button id="btn-play" class="ctl primary" title="Play / pause replay">▶ RUN STORM</button>
+      <button id="btn-reset" class="ctl" title="Reset replay">↺</button>
+      <div class="speed mono">
+        <button data-speed="1" class="spd active">1×</button>
+        <button data-speed="2" class="spd">2×</button>
+        <button data-speed="4" class="spd">4×</button>
+      </div>
+      <div class="lang mono">
+        <button data-lang="mr" class="lng active">मर</button>
+        <button data-lang="hi" class="lng">हि</button>
+        <button data-lang="en" class="lng">EN</button>
+      </div>
+    </div>
+  </header>
+
+  <main id="layout">
+    <section id="map-wrap">
+      <div id="map"></div>
+      <div id="legend" class="panel mono">
+        <span><i class="sw ok"></i> dry / normal</span>
+        <span><i class="sw watch"></i> watch ≥ 8 cm</span>
+        <span><i class="sw alert"></i> alert ≥ 15 cm</span>
+        <span><i class="sw blocked"></i> blocked drain (dispatched)</span>
+        <span><i class="sw sensor"></i> level sensor</span>
+      </div>
+      <div id="engine-card" class="panel">
+        <div class="panel-title mono">TWIN-CAUSE ENGINE <span id="engine-seg-name"></span></div>
+        <div class="ec-bars">
+          <div class="ec-row">
+            <span class="ec-label mono">expected</span>
+            <div class="ec-track"><div id="bar-expected" class="ec-fill cyan"></div></div>
+            <span class="ec-val mono" id="val-expected">0 cm</span>
+          </div>
+          <div class="ec-row">
+            <span class="ec-label mono">observed</span>
+            <div class="ec-track"><div id="bar-observed" class="ec-fill purple"></div></div>
+            <span class="ec-val mono" id="val-observed">— cm</span>
+          </div>
+        </div>
+        <div class="ec-verdict">
+          <span class="mono">Δ <b id="delta-val">0.0</b> cm →</span>
+          <span id="verdict-badge" class="badge">no water</span>
+        </div>
+      </div>
+    </section>
+
+    <section id="rail">
+      <div id="kpis">
+        <div class="kpi"><div class="k-num cyan" id="k-alerts">0</div><div class="k-label mono">street alerts</div></div>
+        <div class="kpi"><div class="k-num lav" id="k-people">0</div><div class="k-label mono">people warned</div></div>
+        <div class="kpi"><div class="k-num amber" id="k-lead">0<small> min</small></div><div class="k-label mono">avg lead time</div></div>
+        <div class="kpi"><div class="k-num red" id="k-drains">0</div><div class="k-label mono">drains flagged</div></div>
+      </div>
+
+      <div class="panel" id="chart-panel">
+        <div class="panel-title mono">RAIN · MCGM AWS REPLAY <span class="dim">tide overlaid</span></div>
+        <canvas id="rain-chart" width="640" height="130"></canvas>
+      </div>
+
+      <div class="panel grow" id="feed-panel">
+        <div class="panel-title mono">LIVE FEED <span class="dim">reports · alerts · dispatches</span></div>
+        <div id="feed"></div>
+      </div>
+
+      <div class="panel" id="composer">
+        <div class="panel-title mono">FILE A CITIZEN REPORT <span class="dim">what the WhatsApp bot ingests</span></div>
+        <div class="composer-row">
+          <select id="rep-seg" class="mono"></select>
+          <input id="rep-depth" type="range" min="2" max="40" value="12" />
+          <span class="mono" id="rep-depth-val">12 cm</span>
+          <button id="rep-send" class="ctl primary">SEND</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="/static/vendor/leaflet/leaflet.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>
