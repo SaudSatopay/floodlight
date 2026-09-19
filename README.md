@@ -16,6 +16,11 @@
 </p>
 
 <p align="center">
+  <b>▶ Live demo: <a href="https://floodlight.onrender.com">floodlight.onrender.com</a></b><br/>
+  <sub>free-tier host — a cold start can take up to a minute, then press ▶ Run storm</sub>
+</p>
+
+<p align="center">
   <sub>
     <a href="#quickstart">quickstart</a> ·
     <a href="#the-twist-in-one-diagram">the twist</a> ·
@@ -141,10 +146,12 @@ estimation discriminates between bands on real photos.
 
 ## Deploy (give judges a URL)
 
-The app is a single uvicorn process with no database — free tiers eat it happily.
+Already done: **https://floodlight.onrender.com** (Render free tier — cold starts take up to a minute).
+
+The app is a single uvicorn process with no database, so free tiers eat it happily.
 [`render.yaml`](render.yaml) and a `Procfile` are included: connect this repo on
-[Render](https://render.com) (or Railway/Fly), and the start command is
-`uvicorn floodlight.app:app --host 0.0.0.0 --port $PORT`.
+[Render](https://render.com) (or Railway/Fly), start command
+`uvicorn floodlight.app:app --host 0.0.0.0 --port $PORT`, health check `/healthz`.
 
 ## Design language
 
