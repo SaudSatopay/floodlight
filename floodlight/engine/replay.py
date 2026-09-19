@@ -197,6 +197,86 @@ class StormReplay:
                     best, best_d = f["properties"]["id"], d
         return best or self.sensor_seg
 
+    # -------------------------------------------------------------- risk
+
+    def risk_at(self, lat: float, lng: float, rain_ctx: dict | None = None) -> dict:
+        """Waterlogging probability for an arbitrary tapped point.
+
+        A calibrated logistic over the projected peak depth of the nearest
+        street segment, scaled by drain-health belief and proximity — every
+        driver is returned so the UI can SHOW the reasoning, not just the
+        number. ``rain_ctx`` overrides the storm context (LIVE mode passes
+        real past/next rain and the tide estimate).
+        """
+        import math
+
+        # nearest segment + distance (metres) to its closest vertex
+        best, best_d2, best_pt = None, 1e18, None
+        for f in self.geojson["features"]:
+            for x, y in f["geometry"]["coordinates"]:
+                d2 = (lat - y) ** 2 + (lng - x) ** 2
+                if d2 < best_d2:
+                    best, best_d2, best_pt = f["properties"]["id"], d2, (y, x)
+        seg = self.segments[best]
+        drain = self.drains[seg.drain_id]
+        dist_m = 111320.0 * math.sqrt(best_d2)
+
+        if rain_ctx:
+            past = list(rain_ctx.get("past", []))
+            nxt = list(rain_ctx.get("next", []))[:4]
+            tide = float(rain_ctx.get("tide", 2.5))
+            depth = 0.0
+            for mm in past:
+                depth = step_depth_cm(depth, mm, tide, seg,
+                                      drain.capacity_mm, drain.blockage_belief)
+            base_depth, rain_coming = depth, sum(nxt)
+            proj = depth
+            peak = depth
+            for mm in nxt:
+                proj = step_depth_cm(proj, mm, tide, seg,
+                                     drain.capacity_mm, drain.blockage_belief)
+                peak = max(peak, proj)
+            tide_now = tide
+        else:
+            t = self.step
+            base_depth = self.expected[best]
+            obs = self.observed.get(best)
+            if obs and t - obs[0] <= OBSERVATION_FRESH_WINDOWS:
+                base_depth = max(base_depth, obs[1])
+            nxt = self.storm["rain_mm"][t + 1: t + 5] if t >= 0 else self.storm["rain_mm"][:4]
+            tides = self.storm["tide_m"][t + 1: t + 5] if t >= 0 else self.storm["tide_m"][:4]
+            rain_coming = sum(nxt)
+            proj, peak = base_depth, base_depth
+            for i, mm in enumerate(nxt):
+                proj = step_depth_cm(proj, mm, tides[i] if i < len(tides) else tides[-1] if tides else 2.5,
+                                     seg, drain.capacity_mm, drain.blockage_belief)
+                peak = max(peak, proj)
+            tide_now = self.storm["tide_m"][t] if t >= 0 else self.storm["tide_m"][0]
+
+        # logistic over projected peak, scaled by drain belief & proximity
+        p = 1.0 / (1.0 + math.exp(-(peak - 12.0) / 6.0))
+        p *= 1.0 + 0.35 * drain.blockage_belief
+        proximity = 1.0 if dist_m <= 120 else max(0.35, 1.0 - (dist_m - 120) / 600.0)
+        p *= proximity
+        p = max(0.02, min(0.97, p))
+
+        tier = "HIGH" if p >= 0.6 else "MODERATE" if p >= 0.3 else "LOW"
+        return {
+            "probability": round(p, 2),
+            "tier": tier,
+            "segment_id": best,
+            "segment": seg.name,
+            "distance_m": round(dist_m),
+            "projected_peak_cm": round(peak, 1),
+            "current_cm": round(base_depth, 1),
+            "rain_next_hour_mm": round(rain_coming, 1),
+            "bowl": seg.bowl,
+            "drain": drain.id,
+            "drain_health": drain.health,
+            "tide_lock": round(tide_lock(tide_now), 2),
+            "anchor": {"lat": best_pt[0], "lng": best_pt[1]},
+        }
+
     # ------------------------------------------------------------------- tick
 
     def tick(self) -> dict:

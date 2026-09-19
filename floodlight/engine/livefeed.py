@@ -115,6 +115,36 @@ def fetch_open_meteo(lat: float, lng: float) -> dict:
             "next": vals[13:], "time": times[12] if len(times) > 12 else ""}
 
 
+def fetch_open_meteo_grid(points: list[tuple[float, float]]) -> list[dict]:
+    """Current precipitation for MANY points in one call (Open-Meteo accepts
+    comma-separated coordinate lists) — feeds the live rain heatmap."""
+    lats = ",".join(f"{p[0]:.3f}" for p in points)
+    lngs = ",".join(f"{p[1]:.3f}" for p in points)
+    url = ("https://api.open-meteo.com/v1/forecast"
+           f"?latitude={lats}&longitude={lngs}"
+           "&current=precipitation&timezone=Asia%2FKolkata")
+    req = urllib.request.Request(url, headers={"User-Agent": "floodlight/0.4"})
+    with urllib.request.urlopen(req, timeout=25) as r:
+        data = json.load(r)
+    rows = data if isinstance(data, list) else [data]
+    out = []
+    for p, row in zip(points, rows):
+        mm = float(row.get("current", {}).get("precipitation", 0) or 0)
+        out.append({"lat": p[0], "lng": p[1], "mm": mm})
+    return out
+
+
+def mumbai_grid() -> list[tuple[float, float]]:
+    """A coarse grid over Greater Mumbai for the live rain heatmap."""
+    pts = []
+    lat0, lat1, lng0, lng1 = 18.90, 19.30, 72.78, 73.00
+    for i in range(6):
+        for j in range(5):
+            pts.append((round(lat0 + (lat1 - lat0) * i / 5, 3),
+                        round(lng0 + (lng1 - lng0) * j / 4, 3)))
+    return pts
+
+
 def tide_estimate() -> float:
     """Approximate semidiurnal tide for Mumbai (labelled EST in the UI) —
     a 12.4 h cycle between ~1.2 m and ~4.4 m. Good enough to show the

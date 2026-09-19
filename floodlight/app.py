@@ -22,8 +22,8 @@ from fastapi.staticfiles import StaticFiles
 import time as _time
 
 from .engine.hydrology import step_depth_cm
-from .engine.livefeed import (LiveMCGMFeed, fetch_open_meteo, live_mode_enabled,
-                              tide_estimate)
+from .engine.livefeed import (LiveMCGMFeed, fetch_open_meteo, fetch_open_meteo_grid,
+                              live_mode_enabled, mumbai_grid, tide_estimate)
 from .engine.replay import AREAS, STORMS, StormReplay
 from .engine.whatsapp import Outbox, guess_depth_cm, parse_messages, verify_token
 
@@ -251,6 +251,12 @@ async def live_city() -> JSONResponse:
         seg_rows.append({"id": sid, "name": seg.name, "state": state,
                          "expected_cm": round(depth, 1)})
 
+    heat = []
+    try:
+        heat = await loop.run_in_executor(None, fetch_open_meteo_grid, mumbai_grid())
+    except Exception:
+        pass
+
     payload = {
         "updated": met["time"], "source": "open-meteo.com · 15-minutely",
         "degraded": degraded,
@@ -261,9 +267,30 @@ async def live_city() -> JSONResponse:
         "tide_est": tide,
         "area_label": area["label"],
         "segments": seg_rows,
+        "heat": heat,
     }
     _live_cache.update(ts=now, payload=payload)
     return JSONResponse(payload)
+
+
+@app.get("/api/risk")
+async def risk(lat: float, lng: float, mode: str = "replay") -> JSONResponse:
+    """Tap-anywhere waterlogging probability, with its drivers."""
+    rain_ctx = None
+    if mode == "live":
+        met = _live_cache["payload"]
+        if not met:
+            loop = asyncio.get_running_loop()
+            try:
+                area = AREAS[hub.replay.area_id]
+                m = await loop.run_in_executor(None, fetch_open_meteo, *area["center"])
+                met = {"past": m["past"] + [m["now"]], "next": m["next"], "tide_est": tide_estimate()}
+            except Exception:
+                met = {"past": [], "next": [], "tide_est": tide_estimate()}
+        rain_ctx = {"past": met["past"], "next": met["next"], "tide": met["tide_est"]}
+    result = hub.replay.risk_at(lat, lng, rain_ctx)
+    result["mode"] = mode
+    return JSONResponse(result)
 
 
 @app.get("/api/outbox")

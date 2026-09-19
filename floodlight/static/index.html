@@ -60,6 +60,7 @@
       <canvas id="rain-fx"></canvas>
 
       <button id="legend-toggle" class="overlay-pill">Map key</button>
+      <button id="heat-toggle" class="overlay-pill on" style="left:96px">Heatmap · on</button>
       <div id="legend" class="panel" hidden>
         <span><i class="sw ok"></i> dry / normal</span>
         <span><i class="sw watch"></i> watch — water rising (≥ 8 cm)</span>
@@ -89,6 +90,9 @@
         <div class="ec-verdict">
           <span>gap <b id="delta-val">0.0</b> cm</span>
           <span id="verdict-badge" class="badge">no significant water</span>
+        </div>
+        <div class="ec-prob" id="engine-prob" hidden>
+          <span>waterlogging probability</span><b id="engine-prob-val">—</b>
         </div>
         <div id="engine-plain" class="ec-plain">Water matches the rain — nothing suspicious underground.</div>
       </div>
@@ -204,6 +208,7 @@
   </footer>
 
   <script src="/static/vendor/leaflet/leaflet.js"></script>
+  <script src="/static/vendor/leaflet-heat.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>

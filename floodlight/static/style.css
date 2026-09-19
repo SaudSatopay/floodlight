@@ -274,6 +274,29 @@ small { font-size: 0.68em; color: var(--sub); font-weight: 400; }
 .flowline { animation: flowmarch 1.1s linear infinite; }
 @keyframes flowmarch { to { stroke-dashoffset: -28; } }
 
+/* tap-anywhere risk popup */
+.risk-pop { min-width: 240px; }
+.rp-head { font-family: var(--mono); font-size: 8px; font-weight: 600; letter-spacing: 0.18em; color: var(--faint); }
+.rp-line { display: flex; align-items: baseline; gap: 10px; margin-top: 4px; }
+.rp-big { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 34px; font-weight: 600; line-height: 1; }
+.rp-tier { font-family: var(--mono); font-size: 9px; font-weight: 600; letter-spacing: 0.12em; border: 1px solid; border-radius: 2px; padding: 2px 7px; }
+.rp-sub { margin-top: 6px; font-size: 11px; color: var(--sub); }
+.rp-driver { display: grid; grid-template-columns: 82px 1fr 62px; gap: 8px; align-items: center; margin-top: 7px; }
+.rp-driver span { font-family: var(--mono); font-size: 8px; letter-spacing: 0.08em; color: var(--faint); text-transform: uppercase; }
+.rp-driver b { font-family: var(--mono); font-size: 9.5px; color: var(--paper); text-align: right; font-weight: 500; }
+.rp-track { height: 6px; background: var(--raise); }
+.rp-track i { display: block; height: 100%; background: var(--teal); }
+.rp-note { margin-top: 9px; padding-top: 7px; border-top: 1px solid var(--hair); font-family: var(--mono); font-size: 8.5px; color: var(--faint); }
+
+/* street-card probability line */
+.ec-prob { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--hair); font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em; color: var(--faint); text-transform: uppercase; }
+.ec-prob b { font-size: 12px; letter-spacing: 0.04em; }
+
+/* interactivity affordances */
+.kpi { cursor: pointer; }
+.kpi:hover { background: var(--raise); }
+.overlay-pill.on { color: var(--teal); border-color: #14454f; }
+
 /* KPI value pop when a number changes */
 .k-num.pop { animation: kpipop 0.45s cubic-bezier(0.2, 1.4, 0.4, 1); }
 @keyframes kpipop { 30% { transform: scale(1.16); color: var(--teal); } }

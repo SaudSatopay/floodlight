@@ -94,8 +94,15 @@ wards* (pinned by tests).
 The **Live city** tab leaves the replay entirely: it pulls **real 15-minutely rainfall** for the active
 ward from [Open-Meteo](https://open-meteo.com) (keyless, genuinely live), shades the streets with the same
 hydrology fed today's actual rain, and draws the weather — **rain particles over the map scale with the
-real rain rate**, flooding streets run animated flow-lines, tide is an honest labelled estimate. Citizen
-reports and the hardware node stream in through the same channels as the replay.
+real rain rate**, flooding streets run animated flow-lines, tide is an honest labelled estimate — and a
+**rain heatmap** paints precipitation across Greater Mumbai from a 30-point Open-Meteo grid (in replay
+mode the heat layer shows waterlogging depth instead). Citizen reports and the hardware node stream in
+through the same channels as the replay.
+
+**Tap anywhere → waterlogging probability.** Click any point on the map and FLOODLIGHT returns a
+calculated probability for that exact spot — a calibrated logistic over the projected peak depth of the
+nearest street, scaled by drain-health belief, tide lock and proximity — with every driver shown as a
+bar, not a black box. Streets, drains, the sensor and the KPI tiles are all clickable too.
 
 The dashboard is deliberately calm: a plain-language status line, four numbers, and a map. Everything else
 is tap-to-reveal — tap a street for its diagnosis card, open the Live feed tab for the raw log (citizen

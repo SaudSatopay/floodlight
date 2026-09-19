@@ -175,6 +175,29 @@ class TestAreaStormMatrix:
         assert p05 >= p17
 
 
+class TestRiskAt:
+    """Tap-anywhere probability: sane bounds, sensitive to storm state."""
+
+    def test_probability_rises_with_the_storm(self):
+        r = StormReplay("cloudburst", "hindmata")
+        pt = (19.01482, 72.84538)                          # on the Hindmata bowl stretch
+        before = r.risk_at(*pt)                            # pre-storm
+        for _ in range(6):
+            r.tick()                                       # into the peak
+        during = r.risk_at(*pt)
+        assert 0.02 <= before["probability"] <= 0.97
+        assert during["probability"] > before["probability"]
+        assert during["tier"] in ("MODERATE", "HIGH")
+        assert during["segment_id"] == "amb-02"
+
+    def test_live_context_dry_day_is_low(self):
+        r = StormReplay("cloudburst", "hindmata")
+        dry = r.risk_at(19.0154, 72.84465,
+                        rain_ctx={"past": [0] * 12, "next": [0] * 4, "tide": 2.0})
+        assert dry["tier"] == "LOW"
+        assert dry["probability"] <= 0.2
+
+
 class TestStormReplay:
     def setup_method(self):
         self.replay = StormReplay()

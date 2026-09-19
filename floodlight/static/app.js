@@ -22,6 +22,9 @@ const state = {
   hintsOn: true,
   mapHintDone: false,
   liveTimer: null,
+  heatOn: true,
+  heatLayer: null,
+  riskPin: null,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -87,6 +90,20 @@ function focusSegment(id, pan = false) {
   $("engine-card").hidden = false;
   if (pan && state.layers[id]) map.panTo(state.layers[id].core.getBounds().getCenter());
   renderEngineCard();
+  // probability for the tapped street, from the same tap-anywhere engine
+  const trio = state.layers[id];
+  if (trio) {
+    const mid = trio.core.getLatLngs()[Math.floor(trio.core.getLatLngs().length / 2)];
+    fetch(`/api/risk?lat=${mid.lat.toFixed(6)}&lng=${mid.lng.toFixed(6)}&mode=${state.mode}`)
+      .then((r) => r.json())
+      .then((r) => {
+        if (state.focusSeg !== id) return;
+        const col = r.tier === "HIGH" ? "#e4574c" : r.tier === "MODERATE" ? "#e0a83c" : "#4fc1d4";
+        $("engine-prob").hidden = false;
+        $("engine-prob-val").textContent = `${Math.round(r.probability * 100)}% · ${r.tier}`;
+        $("engine-prob-val").style.color = col;
+      }).catch(() => {});
+  }
 }
 window.__focus = (id) => focusSegment(id, true);
 
@@ -117,6 +134,7 @@ function buildArea(meta) {
     const core = L.polyline(latlngs, {
       color: "#3e4a52", opacity: 0.9, weight: 3,
       lineCap: "round", lineJoin: "round", className: "segcore",
+      bubblingMouseEvents: false,
     }).addTo(map);
     const flow = L.polyline(latlngs, {
       color: "#eafbff", opacity: 0, weight: 1.7, dashArray: "3 11",
@@ -128,15 +146,36 @@ function buildArea(meta) {
   for (const d of meta.drains) {
     state.drainMarkers[d.id] = L.circleMarker([d.lat, d.lng], {
       radius: 3.5, color: "#5c666b", fillColor: "#0b0d0f", fillOpacity: 1, weight: 1.5,
-    }).addTo(map).bindTooltip(`${d.id} · ${d.name}`, { direction: "top" });
+      bubblingMouseEvents: false,
+    }).addTo(map)
+      .bindTooltip(`${d.id} · ${d.name}`, { direction: "top" })
+      .bindPopup(() => {
+        const live = state.snap && state.snap.drains.find((x) => x.id === d.id);
+        const health = live ? live.health : 95;
+        const col = health < 40 ? "#e4574c" : health < 60 ? "#e0a83c" : "#4fc1d4";
+        return `<div class="pop-name">${d.id} · ${d.name}</div>
+          <div class="pop-row">design capacity <b>${d.capacity_mm} mm / 15 min</b></div>
+          <div class="pop-row">health belief <b style="color:${col}">${health}%</b>
+          ${live && live.dispatched ? " · <b style=\"color:#e0a83c\">CREW DISPATCHED</b>" : ""}</div>
+          <div class="pop-row">${health < 60 ? "surprising water upstream — likely choked" : "behaving as designed"}</div>`;
+      });
   }
   const sf = meta.segments_geojson.features.find((f) => f.properties.id === meta.area.sensor_seg);
   if (sf) {
     const mid = sf.geometry.coordinates[Math.floor(sf.geometry.coordinates.length / 2)];
     state.sensorMarker = L.circleMarker([mid[1], mid[0]], {
       radius: 4.5, color: "#4fc1d4", fillColor: "#4fc1d4", fillOpacity: 0.8, weight: 1.5,
-      className: "sensor-dot",
-    }).addTo(map).bindTooltip("water-level sensor", { direction: "top" });
+      className: "sensor-dot", bubblingMouseEvents: false,
+    }).addTo(map)
+      .bindTooltip("water-level sensor", { direction: "top" })
+      .bindPopup(() => {
+        const row = currentRow(meta.area.sensor_seg);
+        const cm = row && row.observed_cm != null ? `${row.observed_cm.toFixed(1)} cm` : "no fresh reading";
+        return `<div class="pop-name">Ultrasonic level node</div>
+          <div class="pop-row">street <b>${row ? row.name : meta.area.sensor_seg}</b></div>
+          <div class="pop-row">latest depth <b>${cm}</b></div>
+          <div class="pop-row">₹2k ESP32 build — see /hardware in the repo</div>`;
+      });
   }
   map.setView(meta.area.center, meta.area.zoom);
   $("brand-area").textContent = `WARD INSTRUMENT · ${meta.area.label.toUpperCase()}`;
@@ -405,8 +444,79 @@ function renderHints() {
     : "Storm done. Try another area, another storm — or the quiet day, where silence is the win.");
 }
 
+/* ------------------------------------------------------------- heatmap */
+
+function updateHeat() {
+  if (!window.L || !L.heatLayer) return;
+  if (!state.heatLayer) {
+    state.heatLayer = L.heatLayer([], {
+      radius: 34, blur: 26, maxZoom: 17, max: 1.0,
+      gradient: { 0.15: "#12333c", 0.4: "#2e6e7e", 0.6: "#4fc1d4", 0.8: "#e0a83c", 1.0: "#e4574c" },
+    }).addTo(map);
+  }
+  if (!state.heatOn) { state.heatLayer.setLatLngs([]); return; }
+
+  const pts = [];
+  if (state.mode === "live" && state.live && state.live.heat) {
+    // real rain across Greater Mumbai (Open-Meteo grid, mm/15 min)
+    for (const h of state.live.heat) {
+      if (h.mm > 0.05) pts.push([h.lat, h.lng, Math.min(1, h.mm / 6)]);
+    }
+  } else if (state.snap) {
+    // waterlogging heat: depth along every street segment
+    for (const row of state.snap.segments) {
+      const depth = Math.max(row.expected_cm || 0, row.observed_cm || 0);
+      if (depth < 4) continue;
+      const trio = state.layers[row.id];
+      if (!trio) continue;
+      const w = Math.min(1, depth / 40);
+      for (const ll of trio.core.getLatLngs()) pts.push([ll.lat, ll.lng, w]);
+    }
+  }
+  state.heatLayer.setLatLngs(pts);
+}
+
+/* ---------------------------------------------------- tap-anywhere risk */
+
+function riskPopupHtml(r) {
+  const col = r.tier === "HIGH" ? "#e4574c" : r.tier === "MODERATE" ? "#e0a83c" : "#4fc1d4";
+  const pct = Math.round(r.probability * 100);
+  const bar = (label, frac, val) => `
+    <div class="rp-driver"><span>${label}</span>
+      <div class="rp-track"><i style="width:${Math.round(Math.min(1, frac) * 100)}%"></i></div>
+      <b>${val}</b></div>`;
+  return `<div class="risk-pop">
+    <div class="rp-head">WATERLOGGING PROBABILITY</div>
+    <div class="rp-line"><span class="rp-big" style="color:${col}">${pct}%</span>
+      <span class="rp-tier" style="color:${col};border-color:${col}">${r.tier}</span></div>
+    <div class="rp-sub">nearest street: <b>${r.segment}</b> · ${r.distance_m} m away</div>
+    ${bar("projected peak", r.projected_peak_cm / 45, r.projected_peak_cm + " cm")}
+    ${bar("rain next hour", r.rain_next_hour_mm / 60, r.rain_next_hour_mm + " mm")}
+    ${bar("drain risk", (100 - r.drain_health) / 100, r.drain_health + "% health")}
+    ${bar("tide lock", r.tide_lock, Math.round(r.tide_lock * 100) + "%")}
+    <div class="rp-note">${r.mode === "live" ? "computed from today's REAL rain" : "computed from the running storm"} · low-lying factor ×${r.bowl}</div>
+  </div>`;
+}
+
+async function riskAt(latlng) {
+  let r;
+  try {
+    r = await (await fetch(`/api/risk?lat=${latlng.lat.toFixed(6)}&lng=${latlng.lng.toFixed(6)}&mode=${state.mode}`)).json();
+  } catch { return; }
+  if (state.riskPin) map.removeLayer(state.riskPin);
+  const col = r.tier === "HIGH" ? "#e4574c" : r.tier === "MODERATE" ? "#e0a83c" : "#4fc1d4";
+  state.riskPin = L.circleMarker(latlng, {
+    radius: 6, color: col, fillColor: col, fillOpacity: 0.35, weight: 2,
+    bubblingMouseEvents: false,
+  }).addTo(map);
+  state.riskPin.bindPopup(riskPopupHtml(r), { maxWidth: 290 }).openPopup();
+}
+
+map.on("click", (e) => riskAt(e.latlng));
+
 function renderMap() {
   for (const row of segRows()) applySegStyle(row.id, row);
+  updateHeat();
   if (state.mode === "replay" && state.snap) {
     for (const d of state.snap.drains) {
       const m = state.drainMarkers[d.id];
@@ -716,7 +826,21 @@ document.querySelectorAll(".tab").forEach((b) => {
 });
 
 $("legend-toggle").onclick = () => { $("legend").hidden = !$("legend").hidden; };
-$("engine-x").onclick = () => { $("engine-card").hidden = true; state.focusSeg = null; };
+$("heat-toggle").onclick = () => {
+  state.heatOn = !state.heatOn;
+  $("heat-toggle").textContent = `Heatmap · ${state.heatOn ? "on" : "off"}`;
+  $("heat-toggle").classList.toggle("on", state.heatOn);
+  updateHeat();
+};
+// KPI tiles are doors, not decorations
+document.querySelectorAll("#kpis .kpi")[0].onclick = () => document.querySelector('[data-tab="feed"]').click();
+document.querySelectorAll("#kpis .kpi")[1].onclick = () => document.querySelector('[data-tab="feed"]').click();
+document.querySelectorAll("#kpis .kpi")[2].onclick = () => document.querySelector('[data-tab="rain"]').click();
+document.querySelectorAll("#kpis .kpi")[3].onclick = () => {
+  const blocked = segRows().find((s) => s.state === "blocked");
+  if (blocked) focusSegment(blocked.id, true);
+};
+$("engine-x").onclick = () => { $("engine-card").hidden = true; $("engine-prob").hidden = true; state.focusSeg = null; };
 $("composer-toggle").onclick = () => {
   const body = $("composer-body");
   body.hidden = !body.hidden;
