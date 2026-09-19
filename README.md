@@ -103,7 +103,8 @@ lead time.
 
 - **Replay series are synthetic reconstructions** shaped after real MCGM AWS cloudburst records and spring-tide
   curves — clearly labeled in-app. The live system reads the same shapes from `dm.mcgm.gov.in`.
-- **Segment geometry is approximate** (hand-traced around OSM), enough for a pilot demo — production ingests
+- **Segment geometry is road-snapped to real OSM streets** (Overpass extract + shortest-path along the named
+  ways; two small market/approach lanes hand-traced where OSM has no drivable way) — production ingests
   BMC SWD drainage geometry directly.
 - Citizen report photos are licensed archive images standing in for WhatsApp attachments:
   “Bombay flooded street” 2005 (Wikimedia Commons, CC BY 2.0), Rakesh Krishna Kumar (CC BY-SA 2.0),
