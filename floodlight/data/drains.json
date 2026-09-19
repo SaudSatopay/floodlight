@@ -1,0 +1,14 @@
+{
+  "note": "Storm-water drain nodes for the pilot belt. capacity_mm is the rain (mm per 15-min window) the drain can carry away when clean — derived from BMC SWD design norms (~25 mm/hr legacy standard, locally adjusted).",
+  "drains": [
+    { "id": "D-01", "name": "Dadar TT trunk drain",        "capacity_mm": 24, "lat": 19.01840, "lng": 72.84520 },
+    { "id": "D-02", "name": "Tilak approach culvert",      "capacity_mm": 26, "lat": 19.01920, "lng": 72.84300 },
+    { "id": "D-03", "name": "Hindmata bowl trunk drain",   "capacity_mm": 22, "lat": 19.01560, "lng": 72.84500 },
+    { "id": "D-04", "name": "Bharatmata line",             "capacity_mm": 26, "lat": 19.01260, "lng": 72.84400 },
+    { "id": "D-05", "name": "Parel TT collector",          "capacity_mm": 25, "lat": 19.00900, "lng": 72.84300 },
+    { "id": "D-06", "name": "Currey Rd culvert",           "capacity_mm": 24, "lat": 19.01110, "lng": 72.84180 },
+    { "id": "D-07", "name": "Parel Tank Rd lateral",       "capacity_mm": 27, "lat": 19.01340, "lng": 72.84600 },
+    { "id": "D-08", "name": "Sayani Rd line",              "capacity_mm": 28, "lat": 19.00800, "lng": 72.83950 },
+    { "id": "D-09", "name": "Naigaon lateral",             "capacity_mm": 25, "lat": 19.01680, "lng": 72.84850 }
+  ]
+}

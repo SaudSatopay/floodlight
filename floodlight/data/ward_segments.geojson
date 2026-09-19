@@ -1,0 +1,66 @@
+{
+  "type": "FeatureCollection",
+  "name": "FLOODLIGHT pilot ward — Hindmata–Parel flood pocket (approximate OSM-derived geometry)",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "id": "amb-01", "name": "Dr Ambedkar Rd · Dadar TT → Khodadad Circle", "bowl": 0.8, "drain_id": "D-01", "subscribers": 88 },
+      "geometry": { "type": "LineString", "coordinates": [[72.84490, 19.01870], [72.84485, 19.01760], [72.84480, 19.01650]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "amb-02", "name": "Dr Ambedkar Rd · Hindmata Junction", "bowl": 1.5, "drain_id": "D-03", "subscribers": 240 },
+      "geometry": { "type": "LineString", "coordinates": [[72.84480, 19.01650], [72.84465, 19.01540], [72.84440, 19.01420]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "hindmata-mkt", "name": "Hindmata Cloth Market Lane", "bowl": 1.4, "drain_id": "D-03", "subscribers": 185 },
+      "geometry": { "type": "LineString", "coordinates": [[72.84480, 19.01650], [72.84580, 19.01625], [72.84700, 19.01600]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "amb-03", "name": "Dr Ambedkar Rd · Hindmata → Bharatmata", "bowl": 1.2, "drain_id": "D-04", "subscribers": 130 },
+      "geometry": { "type": "LineString", "coordinates": [[72.84440, 19.01420], [72.84415, 19.01300], [72.84380, 19.01180]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "amb-04", "name": "Dr Ambedkar Rd · Bharatmata → Parel TT", "bowl": 0.9, "drain_id": "D-05", "subscribers": 74 },
+      "geometry": { "type": "LineString", "coordinates": [[72.84380, 19.01180], [72.84330, 19.01030], [72.84250, 19.00860]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "parel-tank-rd", "name": "Parel Tank Rd (east of Hindmata)", "bowl": 1.1, "drain_id": "D-07", "subscribers": 96 },
+      "geometry": { "type": "LineString", "coordinates": [[72.84440, 19.01420], [72.84560, 19.01360], [72.84700, 19.01300]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "tilak-01", "name": "Tilak Bridge approach (Dadar)", "bowl": 0.7, "drain_id": "D-02", "subscribers": 52 },
+      "geometry": { "type": "LineString", "coordinates": [[72.84490, 19.01870], [72.84350, 19.01905], [72.84200, 19.01960]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "dadar-st", "name": "Dadar Stn (E) approach · Ranade Rd link", "bowl": 1.0, "drain_id": "D-01", "subscribers": 120 },
+      "geometry": { "type": "LineString", "coordinates": [[72.84490, 19.01870], [72.84590, 19.01900], [72.84660, 19.01925]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "currey-01", "name": "Currey Rd stretch (Bharatmata west)", "bowl": 1.0, "drain_id": "D-06", "subscribers": 61 },
+      "geometry": { "type": "LineString", "coordinates": [[72.84380, 19.01180], [72.84230, 19.01120], [72.84080, 19.01080]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "sayani-01", "name": "Sayani Rd · Elphinstone → Parel TT", "bowl": 0.8, "drain_id": "D-08", "subscribers": 45 },
+      "geometry": { "type": "LineString", "coordinates": [[72.83680, 19.00770], [72.83960, 19.00810], [72.84250, 19.00860]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "parel-village", "name": "Parel Village Lane", "bowl": 1.2, "drain_id": "D-05", "subscribers": 66 },
+      "geometry": { "type": "LineString", "coordinates": [[72.84250, 19.00860], [72.84360, 19.00800], [72.84470, 19.00750]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "naigaon-x", "name": "Naigaon Cross Rd", "bowl": 0.8, "drain_id": "D-09", "subscribers": 38 },
+      "geometry": { "type": "LineString", "coordinates": [[72.84700, 19.01600], [72.84810, 19.01660], [72.84920, 19.01720]] }
+    }
+  ]
+}

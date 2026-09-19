@@ -1,0 +1,20 @@
+{
+  "note": "Scripted WhatsApp reports that replay alongside the storm — each is what a resident would send the FLOODLIGHT bot: geotag, rough depth, a line of text, sometimes a photo. Photos are licensed archive images standing in for report attachments (credits in README).",
+  "sensor": {
+    "segment": "amb-02",
+    "note": "Optional ₹2k ultrasonic node at Hindmata Junction — depth in cm per window.",
+    "depth_cm": [0, 0, 1, 3, 9, 28, 46, 56, 58, 54, 46, 38]
+  },
+  "reports": [
+    { "minute": 8,   "segment": "parel-tank-rd", "depth_cm": 8,  "name": "Sunil · tyre shop",      "text": "पाणी साचायला लागलंय, गटार तुंबलेलं दिसतंय", "photo": "reports/r-crossing.jpg", "source": "whatsapp" },
+    { "minute": 18,  "segment": "parel-tank-rd", "depth_cm": 15, "name": "Farida · kirana",        "text": "नाली जाम है, पानी दुकान की तरफ आ रहा है",  "photo": "reports/r-shops.jpg",    "source": "whatsapp" },
+    { "minute": 26,  "segment": "hindmata-mkt",  "depth_cm": 5,  "name": "Ramesh · cloth merchant","text": "हलकं पाणी, अजून चालू आहे",                   "photo": null,                      "source": "whatsapp" },
+    { "minute": 41,  "segment": "amb-02",        "depth_cm": 16, "name": "Kiran · commuter",       "text": "हिंदमाता ला नेहमीप्रमाणे पाणी",               "photo": "reports/r-bus.jpg",      "source": "whatsapp" },
+    { "minute": 49,  "segment": "hindmata-mkt",  "depth_cm": 21, "name": "Asif · tailor",          "text": "मार्केट लेन में घुटनों तक पानी",              "photo": null,                      "source": "whatsapp" },
+    { "minute": 63,  "segment": "amb-03",        "depth_cm": 19, "name": "Priya · pharmacist",     "text": "Water till Bharatmata signal, bikes stalling", "photo": null,                    "source": "whatsapp" },
+    { "minute": 78,  "segment": "parel-tank-rd", "depth_cm": 24, "name": "Sunil · tyre shop",      "text": "अजूनही तुंबलेलं, क्रू कधी येणार?",            "photo": null,                      "source": "whatsapp" },
+    { "minute": 95,  "segment": "amb-02",        "depth_cm": 26, "name": "Kiran · commuter",       "text": "बस बंद, रस्ता बंद",                          "photo": null,                      "source": "whatsapp" },
+    { "minute": 132, "segment": "amb-02",        "depth_cm": 18, "name": "Ward sweeper crew",      "text": "पानी उतर रहा है",                            "photo": null,                      "source": "whatsapp" },
+    { "minute": 155, "segment": "hindmata-mkt",  "depth_cm": 9,  "name": "Ramesh · cloth merchant","text": "उतरतंय हळूहळू",                              "photo": null,                      "source": "whatsapp" }
+  ]
+}
