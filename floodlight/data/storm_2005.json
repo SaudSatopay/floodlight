@@ -1,0 +1,8 @@
+{
+  "name": "26 July 2005 · the 944 mm day (peak-window reconstruction)",
+  "note": "Mumbai's benchmark catastrophe: 944 mm in 24 h at Santacruz, with an afternoon peak that broke every drainage assumption the city had. This replay reconstructs the worst 3-hour window at AWS cadence, coinciding — as it did that day — with a high spring tide. Values synthesized from IMD/press records of the event.",
+  "start_clock": "14:00",
+  "window_min": 15,
+  "rain_mm":  [8, 15, 28, 45, 62, 70, 58, 49, 38, 30, 22, 15],
+  "tide_m":   [2.5, 2.9, 3.3, 3.8, 4.2, 4.6, 4.9, 4.8, 4.6, 4.3, 4.0, 3.6]
+}

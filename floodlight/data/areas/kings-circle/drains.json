@@ -1,0 +1,47 @@
+{
+ "drains": [
+  {
+   "id": "KC-D1",
+   "name": "King's Circle trunk",
+   "capacity_mm": 22,
+   "lat": 19.0268,
+   "lng": 72.854
+  },
+  {
+   "id": "KC-D2",
+   "name": "Sion Rd line",
+   "capacity_mm": 24,
+   "lat": 19.031,
+   "lng": 72.859
+  },
+  {
+   "id": "KC-D3",
+   "name": "Gandhi Market lateral",
+   "capacity_mm": 26,
+   "lat": 19.0295,
+   "lng": 72.8538
+  },
+  {
+   "id": "KC-D4",
+   "name": "Matunga (E) collector",
+   "capacity_mm": 25,
+   "lat": 19.029,
+   "lng": 72.8572
+  },
+  {
+   "id": "KC-D5",
+   "name": "Sion Circle sump",
+   "capacity_mm": 23,
+   "lat": 19.0388,
+   "lng": 72.8612
+  }
+ ],
+ "sensor_seg": "bhaudaji-01",
+ "blocked": "KC-D3",
+ "center": [
+  19.0305,
+  72.8565
+ ],
+ "zoom": 15,
+ "label": "King's Circle · Gandhi Mkt–Sion (F/N)"
+}

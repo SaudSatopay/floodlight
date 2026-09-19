@@ -1,0 +1,75 @@
+{
+ "drains": [
+  {
+   "id": "D-01",
+   "name": "Dadar TT trunk drain",
+   "capacity_mm": 24,
+   "lat": 19.0184,
+   "lng": 72.8452
+  },
+  {
+   "id": "D-02",
+   "name": "Tilak approach culvert",
+   "capacity_mm": 26,
+   "lat": 19.0192,
+   "lng": 72.843
+  },
+  {
+   "id": "D-03",
+   "name": "Hindmata bowl trunk drain",
+   "capacity_mm": 22,
+   "lat": 19.0156,
+   "lng": 72.845
+  },
+  {
+   "id": "D-04",
+   "name": "Bharatmata line",
+   "capacity_mm": 26,
+   "lat": 19.0126,
+   "lng": 72.844
+  },
+  {
+   "id": "D-05",
+   "name": "Parel TT collector",
+   "capacity_mm": 25,
+   "lat": 19.009,
+   "lng": 72.843
+  },
+  {
+   "id": "D-06",
+   "name": "Currey Rd culvert",
+   "capacity_mm": 24,
+   "lat": 19.0111,
+   "lng": 72.8418
+  },
+  {
+   "id": "D-07",
+   "name": "Parel Tank Rd lateral",
+   "capacity_mm": 27,
+   "lat": 19.0134,
+   "lng": 72.846
+  },
+  {
+   "id": "D-08",
+   "name": "Sayani Rd line",
+   "capacity_mm": 28,
+   "lat": 19.008,
+   "lng": 72.8395
+  },
+  {
+   "id": "D-09",
+   "name": "Naigaon lateral",
+   "capacity_mm": 25,
+   "lat": 19.0168,
+   "lng": 72.8485
+  }
+ ],
+ "sensor_seg": "amb-02",
+ "blocked": "D-07",
+ "center": [
+  19.0135,
+  72.8447
+ ],
+ "zoom": 15,
+ "label": "Hindmata · Dadar–Parel (G/N)"
+}

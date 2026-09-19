@@ -1,21 +1,27 @@
 /* FLOODLIGHT ward instrument — client.
    One SSE stream in, one render pass out. No framework, no build step.
-   UX principle: calm by default, detail on demand — the map answers
-   "where", one tap answers "why". */
+   Modes: REPLAY (storm library over any pilot area) and LIVE CITY
+   (real 15-minutely rainfall via Open-Meteo, same hydrology).
+   Weather is drawn, not just numbered: rain particles over the map,
+   flow-lines on flooding streets. */
 
 const state = {
   meta: null,
   snap: null,
+  live: null,                   // /api/live payload
+  mode: "replay",               // "replay" | "live"
   lang: "mr",
   running: false,
-  focusSeg: null,               // nothing selected until the user taps
-  layers: {},                   // segment id → {under, core}
+  focusSeg: null,
+  layers: {},                   // segment id → {under, core, flow}
   drainMarkers: {},
+  sensorMarker: null,
   renderedFeed: new Set(),
   feedUnseen: 0,
   activeTab: "status",
   hintsOn: true,
   mapHintDone: false,
+  liveTimer: null,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -23,7 +29,7 @@ const $ = (id) => document.getElementById(id);
 /* ---------------------------------------------------------------- map */
 
 const map = L.map("map", {
-  zoomControl: false, attributionControl: true, minZoom: 14, maxZoom: 18,
+  zoomControl: false, attributionControl: true, minZoom: 13, maxZoom: 18,
 }).setView([19.0135, 72.8447], 15);
 
 L.control.zoom({ position: "bottomright" }).addTo(map);
@@ -39,31 +45,36 @@ window.addEventListener("resize", fixMapSize);
 window.addEventListener("load", () => { fixMapSize(); setTimeout(fixMapSize, 250); setTimeout(fixMapSize, 900); });
 setTimeout(fixMapSize, 60);
 
-/* Cased cartographic strokes — colour is semantics only. */
 const SEG_STYLES = {
-  ok:      { core: ["#3e4a52", 0.9, 3.0], cls: "seg-ok" },
-  watch:   { core: ["#e0a83c", 1.0, 4.5], cls: "seg-watch" },
-  alert:   { core: ["#e4574c", 1.0, 5.0], cls: "seg-alert" },
-  blocked: { core: ["#e0a83c", 1.0, 4.5], cls: "seg-blocked", dash: "7 6" },
+  ok:      { core: ["#3e4a52", 0.9, 3.0] },
+  watch:   { core: ["#e0a83c", 1.0, 4.5] },
+  alert:   { core: ["#e4574c", 1.0, 5.0] },
+  blocked: { core: ["#e0a83c", 1.0, 4.5], dash: "7 6", cls: "seg-blocked" },
 };
 const CASING = { color: "#04060a", opacity: 0.85 };
 
 function applySegStyle(id, row) {
-  const pair = state.layers[id];
-  if (!pair) return;
+  const trio = state.layers[id];
+  if (!trio) return;
   const st = SEG_STYLES[row ? row.state : "ok"];
-  const depth = row ? Math.max(row.expected_cm, row.observed_cm || 0) : 0;
+  const depth = row ? Math.max(row.expected_cm || 0, row.observed_cm || 0) : 0;
   const swell = Math.min(1.6, depth / 22);
   const w = st.core[2] + swell;
-  pair.under.setStyle({ color: CASING.color, opacity: CASING.opacity, weight: w + 3.5 });
-  pair.core.setStyle({ color: st.core[0], opacity: st.core[1], weight: w, dashArray: st.dash || null });
-  const el = pair.core.getElement();
-  if (el) el.setAttribute("class", `leaflet-interactive segcore ${st.cls}`);
+  trio.under.setStyle({ color: CASING.color, opacity: CASING.opacity, weight: w + 3.5 });
+  trio.core.setStyle({ color: st.core[0], opacity: st.core[1], weight: w, dashArray: st.dash || null });
+  const flowing = row && (row.state === "watch" || row.state === "alert" || row.state === "blocked");
+  trio.flow.setStyle({ opacity: flowing ? 0.55 : 0 });
+  const el = trio.core.getElement();
+  if (el) el.setAttribute("class", `leaflet-interactive segcore ${st.cls || ""}`);
+  const fe = trio.flow.getElement();
+  if (fe) fe.setAttribute("class", "leaflet-interactive flowline");
 }
 
-function currentRow(id) {
-  return state.snap ? state.snap.segments.find((s) => s.id === id) : null;
+function segRows() {
+  if (state.mode === "live" && state.live) return state.live.segments;
+  return state.snap ? state.snap.segments : [];
 }
+function currentRow(id) { return segRows().find((s) => s.id === id) || null; }
 
 function focusSegment(id, pan = false) {
   state.focusSeg = id;
@@ -73,16 +84,25 @@ function focusSegment(id, pan = false) {
   if (pan && state.layers[id]) map.panTo(state.layers[id].core.getBounds().getCenter());
   renderEngineCard();
 }
-window.__focus = (id) => focusSegment(id, true);   // demo / capture hook
+window.__focus = (id) => focusSegment(id, true);
 
-async function initMeta() {
-  const meta = await (await fetch("/api/meta")).json();
-  state.meta = meta;
-  $("storm-name").textContent = meta.storm.name;
+/* -------------------------------------------------- area (re)build */
 
-  map.createPane("glow");
-  map.getPane("glow").style.zIndex = 398;
+function clearMapLayers() {
+  for (const t of Object.values(state.layers)) {
+    map.removeLayer(t.under); map.removeLayer(t.core); map.removeLayer(t.flow);
+  }
+  for (const m of Object.values(state.drainMarkers)) map.removeLayer(m);
+  if (state.sensorMarker) map.removeLayer(state.sensorMarker);
+  state.layers = {}; state.drainMarkers = {}; state.sensorMarker = null;
+}
 
+function buildArea(meta) {
+  clearMapLayers();
+  if (!map.getPane("glow")) {
+    map.createPane("glow");
+    map.getPane("glow").style.zIndex = 398;
+  }
   for (const f of meta.segments_geojson.features) {
     const id = f.properties.id;
     const latlngs = f.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
@@ -92,51 +112,125 @@ async function initMeta() {
     }).addTo(map);
     const core = L.polyline(latlngs, {
       color: "#3e4a52", opacity: 0.9, weight: 3,
-      lineCap: "round", lineJoin: "round", className: "segcore seg-ok",
+      lineCap: "round", lineJoin: "round", className: "segcore",
     }).addTo(map);
-    state.layers[id] = { under, core };
+    const flow = L.polyline(latlngs, {
+      color: "#dff6fb", opacity: 0, weight: 1.5, dashArray: "2 12",
+      lineCap: "round", lineJoin: "round", className: "flowline", interactive: false,
+    }).addTo(map);
+    state.layers[id] = { under, core, flow };
     core.on("click", () => focusSegment(id));
   }
-
   for (const d of meta.drains) {
     state.drainMarkers[d.id] = L.circleMarker([d.lat, d.lng], {
       radius: 3.5, color: "#5c666b", fillColor: "#0b0d0f", fillOpacity: 1, weight: 1.5,
     }).addTo(map).bindTooltip(`${d.id} · ${d.name}`, { direction: "top" });
   }
-
-  L.circleMarker([19.0154, 72.84465], {
-    radius: 4.5, color: "#4fc1d4", fillColor: "#4fc1d4", fillOpacity: 0.8, weight: 1.5,
-    className: "sensor-dot",
-  }).addTo(map).bindTooltip("water-level sensor · Hindmata Jn", { direction: "top" });
+  const sf = meta.segments_geojson.features.find((f) => f.properties.id === meta.area.sensor_seg);
+  if (sf) {
+    const mid = sf.geometry.coordinates[Math.floor(sf.geometry.coordinates.length / 2)];
+    state.sensorMarker = L.circleMarker([mid[1], mid[0]], {
+      radius: 4.5, color: "#4fc1d4", fillColor: "#4fc1d4", fillOpacity: 0.8, weight: 1.5,
+      className: "sensor-dot",
+    }).addTo(map).bindTooltip("water-level sensor", { direction: "top" });
+  }
+  map.setView(meta.area.center, meta.area.zoom);
+  $("brand-area").textContent = `WARD INSTRUMENT · ${meta.area.label.toUpperCase()}`;
 
   const sel = $("rep-seg");
+  sel.innerHTML = "";
   for (const f of meta.segments_geojson.features) {
     const o = document.createElement("option");
     o.value = f.properties.id;
     o.textContent = f.properties.name;
-    if (f.properties.id === "hindmata-mkt") o.selected = true;
     sel.appendChild(o);
   }
+}
 
-  const ssel = $("storm-sel");
-  for (const s of meta.storms) {
-    const o = document.createElement("option");
-    o.value = s.id;
-    o.textContent = s.label;
-    if (s.id === meta.active_storm) o.selected = true;
-    ssel.appendChild(o);
+async function refreshMeta() {
+  const meta = await (await fetch("/api/meta")).json();
+  state.meta = meta;
+  $("storm-name").textContent = meta.storm.name;
+  buildArea(meta);
+
+  const fill = (el, items, active) => {
+    el.innerHTML = "";
+    for (const it of items) {
+      const o = document.createElement("option");
+      o.value = it.id; o.textContent = it.label;
+      if (it.id === active) o.selected = true;
+      el.appendChild(o);
+    }
+  };
+  fill($("storm-sel"), meta.storms, meta.active_storm);
+  fill($("area-sel"), meta.areas, meta.active_area);
+}
+
+/* ------------------------------------------------------- rain particles */
+
+const fx = { canvas: null, ctx: null, drops: [], splashes: [], intensity: 0, last: 0 };
+
+function fxIntensity() {
+  const mm = state.mode === "live"
+    ? (state.live ? state.live.rain_now * 4 : 0)   // live mm/15min are small — scale for visibility
+    : (state.snap && state.running !== false ? state.snap.rain_now : (state.snap ? state.snap.rain_now : 0));
+  return Math.max(0, Math.min(48, mm));
+}
+
+function fxLoop(ts) {
+  const c = fx.canvas, ctx = fx.ctx;
+  if (!c) return;
+  if (c.width !== c.clientWidth || c.height !== c.clientHeight) {
+    c.width = c.clientWidth; c.height = c.clientHeight;
   }
+  const target = fxIntensity();
+  fx.intensity += (target - fx.intensity) * 0.04;         // ease toward real value
+  const want = Math.round(fx.intensity * 9);              // drops on screen
+
+  while (fx.drops.length < want) {
+    fx.drops.push({
+      x: Math.random() * (c.width + 120) - 60,
+      y: Math.random() * -c.height,
+      len: 9 + Math.random() * 13,
+      spd: 9 + Math.random() * 7,
+    });
+  }
+  if (fx.drops.length > want) fx.drops.length = want;
+
+  ctx.clearRect(0, 0, c.width, c.height);
+  if (fx.drops.length) {
+    ctx.strokeStyle = "rgba(160, 208, 222, 0.5)";
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    for (const d of fx.drops) {
+      ctx.moveTo(d.x, d.y);
+      ctx.lineTo(d.x - d.len * 0.28, d.y + d.len);
+      d.x -= d.spd * 0.28; d.y += d.spd;
+      if (d.y > c.height) {
+        if (Math.random() < 0.3) fx.splashes.push({ x: d.x, y: c.height - 2, r: 1, a: 0.5 });
+        d.y = -12 - Math.random() * 60;
+        d.x = Math.random() * (c.width + 120) - 30;
+      }
+    }
+    ctx.stroke();
+    for (let i = fx.splashes.length - 1; i >= 0; i--) {
+      const s = fx.splashes[i];
+      ctx.strokeStyle = `rgba(155, 200, 214, ${s.a})`;
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.r, Math.PI, 2 * Math.PI); ctx.stroke();
+      s.r += 0.7; s.a -= 0.045;
+      if (s.a <= 0) fx.splashes.splice(i, 1);
+    }
+  }
+  requestAnimationFrame(fxLoop);
 }
 
 /* ------------------------------------------------------------- renders */
 
-function setHint(text) {
-  if (!state.hintsOn) return;
-  $("hint-text").textContent = text;
-}
+function setHint(text) { if (state.hintsOn) $("hint-text").textContent = text; }
 
 function renderTop() {
   const s = state.snap;
+  if (!s) return;
   if (s.running !== undefined && s.running !== state.running) {
     state.running = s.running;
     $("btn-play").textContent = s.running ? "❚❚ Pause" : "▶ Run storm";
@@ -151,8 +245,9 @@ function renderTop() {
     s.tide_lock >= 0.85 ? "OUTFALLS SEALED" : s.tide_lock > 0.3 ? "OUTFALLS CHOKING" : "OUTFALLS OPEN";
 
   $("sb-window").textContent = `WINDOW ${String(Math.max(0, s.step + 1)).padStart(2, "0")}/${s.rain_full.length} · MIN ${s.minute}`;
-  $("sb-live").textContent = s.finished ? "COMPLETE" : state.running ? "RUNNING" : "STANDBY";
-  $("storm-name").textContent = s.storm_name || "—";
+  $("sb-live").textContent = state.mode === "live" ? "LIVE CITY"
+    : s.finished ? "COMPLETE" : state.running ? "RUNNING" : "STANDBY";
+  $("storm-name").textContent = `${s.area_label} · ${s.storm_name}`;
   $("sb-outbox").textContent = `WA OUTBOX · ${s.outbox.mode.toUpperCase()} · ${s.outbox.sent}`;
 
   $("k-alerts").textContent = s.kpis.alerts_sent;
@@ -169,10 +264,9 @@ function renderTop() {
 }
 
 function worstSegment() {
-  const s = state.snap;
   let best = null, bestDepth = -1;
-  for (const row of s.segments) {
-    const d = Math.max(row.expected_cm, row.observed_cm || 0);
+  for (const row of segRows()) {
+    const d = Math.max(row.expected_cm || 0, row.observed_cm || 0);
     if (d > bestDepth) { bestDepth = d; best = row; }
   }
   return bestDepth >= 6 ? { row: best, depth: bestDepth } : null;
@@ -187,7 +281,7 @@ function renderSummary() {
 
   if (s.step < 0) {
     line.textContent = "Ward is quiet.";
-    sub.textContent = "Pick a scenario and press ▶ Run storm — everything updates every 15 storm-minutes.";
+    sub.textContent = `${s.area_label}. Pick a storm and press ▶ Run storm — or open Live city for real rainfall right now.`;
   } else if (!s.finished) {
     if (flooding === 0 && blocked === 0) {
       line.textContent = "Raining — streets holding.";
@@ -199,10 +293,8 @@ function renderSummary() {
   } else if (quiet) {
     line.textContent = s.kpis.alerts_sent === 0
       ? "A normal rainy day: zero alerts sent."
-      : `Quiet day done · ${s.kpis.alerts_sent} alerts.`;
-    sub.textContent = s.kpis.drains_flagged
-      ? "Nobody's phone buzzed for nothing — and the blocked drain at Parel Tank Rd still got caught and dispatched."
-      : "No false alarms on a day that didn't deserve any.";
+      : "Quiet day: only the blocked street needed anyone.";
+    sub.textContent = "No healthy street buzzed a single phone — and the choked drain still got caught and dispatched.";
   } else {
     line.textContent = `Storm over: ${s.kpis.alerts_sent} streets warned early.`;
     sub.textContent = `${s.kpis.people_warned.toLocaleString("en-IN")} people got an average ${s.kpis.avg_lead_min}-minute head start before the water. Reset to run it again.`;
@@ -210,7 +302,7 @@ function renderSummary() {
 
   const worst = worstSegment();
   const row = $("worst-row");
-  if (worst && !s.finished) {
+  if (worst && !s.finished && state.mode === "replay") {
     row.hidden = false;
     $("worst-name").textContent = `${worst.row.name} · ~${Math.round(worst.depth)} cm`;
     row.onclick = () => focusSegment(worst.row.id, true);
@@ -221,26 +313,29 @@ function renderSummary() {
 
 function renderHints() {
   const s = state.snap;
-  if (s.step < 0) setHint("Press ▶ Run storm to replay a real Mumbai cloudburst — or pick the quiet day in Scenario.");
+  if (state.mode === "live") { setHint("LIVE CITY: real rainfall over this ward, updated every 15 minutes. Streets shade from today's actual rain."); return; }
+  if (s.step < 0) setHint("Pick an AREA and a STORM — 26 July 2005 is in the library. Or open Live city for real weather.");
   else if (!s.finished && !state.mapHintDone) setHint("Watch the map change colour — then tap any street to see WHY it floods.");
-  else if (!s.finished) setHint("Amber dashes = a blocked drain the engine diagnosed. Open Live feed for the dispatch order.");
+  else if (!s.finished) setHint("Amber dashes = a blocked drain the engine diagnosed. Open Feed for the dispatch order.");
   else setHint(s.storm_id === "quiet"
-    ? "Zero false alarms today. Switch the scenario to the cloudburst to see the loud day."
-    : "Storm done. Try the Quiet Tuesday scenario — the system's job there is to stay silent.");
+    ? "Zero false alarms today. Now try 26 July 2005 — same ward, very different afternoon."
+    : "Storm done. Try another area, another storm — or the quiet day, where silence is the win.");
 }
 
 function renderMap() {
-  for (const row of state.snap.segments) applySegStyle(row.id, row);
-  for (const d of state.snap.drains) {
-    const m = state.drainMarkers[d.id];
-    if (!m) continue;
-    const hot = d.dispatched || d.health < 60;
-    m.setStyle({
-      color: hot ? "#e0a83c" : "#5c666b",
-      fillColor: hot ? "#1c1508" : "#0b0d0f",
-      weight: hot ? 2 : 1.5,
-      radius: hot ? 5 : 3.5,
-    });
+  for (const row of segRows()) applySegStyle(row.id, row);
+  if (state.mode === "replay" && state.snap) {
+    for (const d of state.snap.drains) {
+      const m = state.drainMarkers[d.id];
+      if (!m) continue;
+      const hot = d.dispatched || d.health < 60;
+      m.setStyle({
+        color: hot ? "#e0a83c" : "#5c666b",
+        fillColor: hot ? "#1c1508" : "#0b0d0f",
+        weight: hot ? 2 : 1.5,
+        radius: hot ? 5 : 3.5,
+      });
+    }
   }
 }
 
@@ -248,7 +343,7 @@ function renderEngineCard() {
   if (!state.focusSeg) return;
   const row = currentRow(state.focusSeg);
   if (!row) return;
-  const exp = row.expected_cm, obs = row.observed_cm;
+  const exp = row.expected_cm || 0, obs = row.observed_cm ?? null;
   const scale = 45;
   $("engine-seg-name").textContent = row.name;
   $("bar-expected").style.width = `${Math.min(100, (exp / scale) * 100)}%`;
@@ -268,7 +363,9 @@ function renderEngineCard() {
   } else if (Math.max(exp, obs || 0) >= 8) {
     badge.classList.add("causeA");
     badge.textContent = "CAUSE A · RAIN OVERLOAD";
-    plain.textContent = "The water matches what the rain model predicts — the sky simply beat the drain. People here were warned before it crossed the doorstep.";
+    plain.textContent = state.mode === "live"
+      ? "Today's real rain alone would put water here — the model flags it before anyone reports it."
+      : "The water matches what the rain model predicts — the sky simply beat the drain. People here were warned before it crossed the doorstep.";
   } else {
     badge.textContent = "NO SIGNIFICANT WATER";
     plain.textContent = "Expected and observed both near zero. This street is fine.";
@@ -277,8 +374,9 @@ function renderEngineCard() {
 
 function renderChart() {
   const s = state.snap;
+  if (!s) return;
   const cv = $("rain-chart");
-  if (!cv.clientWidth) return;                 // pane hidden — skip
+  if (!cv.clientWidth) return;
   const ctx = cv.getContext("2d");
   const W = (cv.width = cv.clientWidth * 2);
   const H = (cv.height = 260);
@@ -302,8 +400,7 @@ function renderChart() {
   ctx.lineWidth = 2;
   ctx.setLineDash([7, 6]);
   ctx.beginPath();
-  const tides = s.tide_full || state.meta.storm.tide_m;
-  tides.slice(0, n).forEach((t, i) => {
+  (s.tide_full || []).slice(0, n).forEach((t, i) => {
     const y = H - 40 - ((t - 1.5) / 3.5) * (H - 80);
     const x = i * bw + bw / 2;
     i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
@@ -311,6 +408,81 @@ function renderChart() {
   ctx.stroke();
   ctx.setLineDash([]);
 }
+
+/* ----------------------------------------------------------- live city */
+
+async function pollLive() {
+  try {
+    state.live = await (await fetch("/api/live")).json();
+  } catch { return; }
+  if (state.mode !== "live") return;
+  const l = state.live;
+  $("live-rain").innerHTML = `${l.rain_now.toFixed(1)}<small> mm / 15 min</small>`;
+  $("live-area").textContent = l.area_label;
+  $("live-under").textContent = l.degraded
+    ? "live feed unreachable — showing zero-rain baseline (DEGRADED)"
+    : l.rain_now >= 4 ? `heavy rain over ${l.area_label} right now`
+    : l.rain_now > 0.2 ? `raining over ${l.area_label} right now`
+    : `dry over ${l.area_label} right now`;
+  $("live-3h").textContent = l.past_3h_total.toFixed(1);
+  $("live-next").textContent = l.next.reduce((a, b) => a + b, 0).toFixed(1);
+  $("live-tide").textContent = l.tide_est.toFixed(1);
+
+  const cv = $("live-chart");
+  if (cv.clientWidth) {
+    const ctx = cv.getContext("2d");
+    const W = (cv.width = cv.clientWidth * 2), H = (cv.height = 220);
+    ctx.clearRect(0, 0, W, H);
+    const series = [...l.past, l.rain_now, ...l.next];
+    const nowIdx = l.past.length;
+    const bw = W / series.length;
+    const mx = Math.max(...series, 1);
+    series.forEach((mm, i) => {
+      const h = Math.max(2, (mm / mx) * (H - 50));
+      ctx.fillStyle = i === nowIdx ? "#4fc1d4" : i < nowIdx ? "#2e6e7e" : "#20444d";
+      ctx.fillRect(i * bw + 3, H - 26 - h, bw - 6, h);
+    });
+    ctx.fillStyle = "#5c666b";
+    ctx.font = "500 16px IBM Plex Mono, monospace";
+    ctx.textAlign = "center";
+    ctx.fillText("−3h", bw * 1.2, H - 8);
+    ctx.fillText("now", (nowIdx + 0.5) * bw, H - 8);
+    ctx.fillText("+2h", W - bw * 1.2, H - 8);
+  }
+
+  const list = $("live-risk-list");
+  list.innerHTML = "";
+  const rows = [...l.segments].sort((a, b) => b.expected_cm - a.expected_cm).slice(0, 4);
+  for (const r of rows) {
+    const div = document.createElement("div");
+    div.className = `live-seg ${r.state}`;
+    div.innerHTML = `<span class="ls-state">${r.state.toUpperCase()}</span>
+      <span class="ls-name">${r.name}</span>
+      <span class="ls-cm">${r.expected_cm.toFixed(1)} cm</span>`;
+    div.onclick = () => focusSegment(r.id, true);
+    list.appendChild(div);
+  }
+  renderMap();
+  renderEngineCard();
+}
+
+function enterLive() {
+  state.mode = "live";
+  $("live-dot").hidden = false;
+  pollLive();
+  if (!state.liveTimer) state.liveTimer = setInterval(pollLive, 60000);
+  renderMap();
+  renderHints();
+  $("sb-live").textContent = "LIVE CITY";
+}
+
+function exitLive() {
+  state.mode = "replay";
+  renderMap();
+  if (state.snap) renderTop();
+}
+
+/* ---------------------------------------------------------------- feed */
 
 function feedCard(kind, head, bodyHtml) {
   const div = document.createElement("div");
@@ -329,6 +501,7 @@ function bumpFeedBadge() {
 
 function renderFeed() {
   const s = state.snap;
+  if (!s) return;
   const feed = $("feed");
   const items = [];
 
@@ -380,7 +553,7 @@ function renderFeed() {
 function renderAll() {
   if (!state.snap || !state.meta) return;
   renderTop();
-  renderMap();
+  if (state.mode === "replay") renderMap();
   renderEngineCard();
   renderChart();
   renderFeed();
@@ -420,6 +593,12 @@ function clearLocalRun() {
 $("btn-play").onclick = () => control({ action: state.running ? "pause" : "start" });
 $("btn-reset").onclick = async () => { clearLocalRun(); await control({ action: "reset" }); };
 $("storm-sel").onchange = async (e) => { clearLocalRun(); await control({ action: "load", storm: e.target.value }); };
+$("area-sel").onchange = async (e) => {
+  clearLocalRun();
+  await control({ action: "load", area: e.target.value });
+  await refreshMeta();
+  if (state.mode === "live") pollLive();
+};
 
 document.querySelectorAll(".spd").forEach((b) => {
   b.onclick = () => {
@@ -439,23 +618,20 @@ document.querySelectorAll(".lng").forEach((b) => {
   };
 });
 
-/* tabs */
 document.querySelectorAll(".tab").forEach((b) => {
   b.onclick = () => {
     document.querySelectorAll(".tab").forEach((x) => x.classList.remove("active"));
     document.querySelectorAll(".pane").forEach((x) => x.classList.remove("active"));
     b.classList.add("active");
-    state.activeTab = b.dataset.tab;
-    $(`pane-${b.dataset.tab}`).classList.add("active");
-    if (b.dataset.tab === "feed") {
-      state.feedUnseen = 0;
-      $("feed-badge").hidden = true;
-    }
-    if (b.dataset.tab === "rain") renderChart();
+    const tab = b.dataset.tab;
+    state.activeTab = tab;
+    $(`pane-${tab}`).classList.add("active");
+    if (tab === "feed") { state.feedUnseen = 0; $("feed-badge").hidden = true; }
+    if (tab === "rain") renderChart();
+    if (tab === "live") enterLive(); else if (state.mode === "live") exitLive();
   };
 });
 
-/* reveal toggles */
 $("legend-toggle").onclick = () => { $("legend").hidden = !$("legend").hidden; };
 $("engine-x").onclick = () => { $("engine-card").hidden = true; state.focusSeg = null; };
 $("composer-toggle").onclick = () => {
@@ -483,7 +659,11 @@ $("rep-send").onclick = async () => {
 
 /* ---------------------------------------------------------------- boot */
 
-initMeta().then(() => {
+refreshMeta().then(() => {
   connect();
   fetch("/api/state").then((r) => r.json()).then((s) => { state.snap = s; renderAll(); });
+  fx.canvas = $("rain-fx");
+  fx.ctx = fx.canvas.getContext("2d");
+  requestAnimationFrame(fxLoop);
+  pollLive();                                  // warm the live cache early
 });

@@ -1,0 +1,54 @@
+{
+ "drains": [
+  {
+   "id": "MS-D1",
+   "name": "Khira Nagar culvert",
+   "capacity_mm": 25,
+   "lat": 19.0755,
+   "lng": 72.8399
+  },
+  {
+   "id": "MS-D2",
+   "name": "Santacruz stn collector",
+   "capacity_mm": 23,
+   "lat": 19.081,
+   "lng": 72.841
+  },
+  {
+   "id": "MS-D3",
+   "name": "Linking Rd line",
+   "capacity_mm": 26,
+   "lat": 19.0725,
+   "lng": 72.8372
+  },
+  {
+   "id": "MS-D4",
+   "name": "Milan Subway sump & pumps",
+   "capacity_mm": 21,
+   "lat": 19.0793,
+   "lng": 72.8433
+  },
+  {
+   "id": "MS-D5",
+   "name": "Nehru Rd lateral",
+   "capacity_mm": 25,
+   "lat": 19.0818,
+   "lng": 72.8474
+  },
+  {
+   "id": "MS-D6",
+   "name": "Juhu Lane line",
+   "capacity_mm": 24,
+   "lat": 19.0868,
+   "lng": 72.8408
+  }
+ ],
+ "sensor_seg": "milan-sub",
+ "blocked": "MS-D4",
+ "center": [
+  19.0795,
+  72.8425
+ ],
+ "zoom": 15,
+ "label": "Milan Subway · Andheri–Santacruz (K/E)"
+}

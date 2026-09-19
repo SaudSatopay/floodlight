@@ -15,7 +15,7 @@
   <header id="topbar">
     <div class="brand">
       <span class="logo"><b>FLOOD</b><i>LIGHT</i></span>
-      <span class="tag">WARD INSTRUMENT · HINDMATA–PAREL PILOT</span>
+      <span class="tag" id="brand-area">WARD INSTRUMENT · HINDMATA–PAREL PILOT</span>
     </div>
     <div class="clockbox">
       <div class="clock" id="clock">14:00</div>
@@ -57,6 +57,7 @@
   <main id="layout">
     <section id="map-wrap">
       <div id="map"></div>
+      <canvas id="rain-fx"></canvas>
 
       <button id="legend-toggle" class="overlay-pill">Map key</button>
       <div id="legend" class="panel" hidden>
@@ -96,14 +97,15 @@
     <section id="rail">
       <nav id="tabs">
         <button class="tab active" data-tab="status">Status</button>
-        <button class="tab" data-tab="feed">Live feed <em id="feed-badge" hidden>0</em></button>
+        <button class="tab" data-tab="live">Live city <i id="live-dot" hidden></i></button>
+        <button class="tab" data-tab="feed">Feed <em id="feed-badge" hidden>0</em></button>
         <button class="tab" data-tab="rain">Rainfall</button>
       </nav>
 
       <div class="pane active" id="pane-status">
         <div id="summary">
           <div id="summary-line">Ward is quiet.</div>
-          <div id="summary-sub">Pick a scenario and press ▶ Run storm — everything on screen updates every 15 storm-minutes.</div>
+          <div id="summary-sub">Pick an area and a storm, press ▶ Run storm — everything updates every 15 storm-minutes.</div>
         </div>
 
         <div id="kpis">
@@ -120,15 +122,50 @@
         </button>
 
         <div id="scenario">
-          <div class="panel-title">Scenario</div>
+          <div class="panel-title">Area</div>
+          <select id="area-sel"></select>
+          <div class="panel-title" style="margin-top:14px">Storm</div>
           <select id="storm-sel"></select>
-          <p id="scenario-note">The cloudburst proves early warnings. The quiet day proves silence — no false alarms, and the blocked drain still gets caught.</p>
+          <p id="scenario-note">Three flood-famous wards × four real storm profiles — including 26 July 2005 and a quiet day whose only correct output is silence. Every pairing replays through the same engine.</p>
         </div>
 
         <div id="node-strip">
           <span class="panel-title" style="margin:0">Hardware node</span>
           <span id="node-badge" class="nodechip sim">SIMULATED</span>
         </div>
+      </div>
+
+      <div class="pane" id="pane-live">
+        <div id="live-hero">
+          <div class="live-row">
+            <span class="live-pulse"></span>
+            <span class="panel-title" style="margin:0">LIVE CITY · REAL RAINFALL</span>
+          </div>
+          <div id="live-rain" class="live-big">0.0<small> mm / 15 min</small></div>
+          <div id="live-under" class="live-under">dry over <span id="live-area">this ward</span> right now</div>
+        </div>
+
+        <div class="live-grid">
+          <div class="live-cell"><div class="lc-num" id="live-3h">0.0</div><div class="lc-label">mm · last 3 h (real)</div></div>
+          <div class="live-cell"><div class="lc-num" id="live-next">0.0</div><div class="lc-label">mm · next 2 h (forecast)</div></div>
+          <div class="live-cell"><div class="lc-num" id="live-tide">2.5</div><div class="lc-label">tide m · estimate</div></div>
+        </div>
+
+        <div id="live-chart-wrap">
+          <div class="panel-title">Past 3 h · now · next 2 h</div>
+          <canvas id="live-chart" width="640" height="110"></canvas>
+        </div>
+
+        <div id="live-risk">
+          <div class="panel-title">What today's real rain should be doing</div>
+          <div id="live-risk-list"></div>
+        </div>
+
+        <p class="live-note" id="live-note">
+          rainfall — real, <b>open-meteo.com</b> (15-minutely) · tide — approximate semidiurnal estimate ·
+          street shading — the same hydrology model, fed today's actual rain. Citizen reports & the hardware
+          node stream in through the same channels as the replay.
+        </p>
       </div>
 
       <div class="pane" id="pane-feed">
@@ -148,7 +185,7 @@
       </div>
 
       <div class="pane" id="pane-rain">
-        <div class="panel-title" style="padding:0 16px">Rainfall · MCGM AWS replay</div>
+        <div class="panel-title" style="padding:0 16px">Storm profile · AWS cadence</div>
         <canvas id="rain-chart" width="640" height="116"></canvas>
         <p class="rain-note">Bars — rain per 15 minutes. Dashed line — the tide: when it rises past ~3 m the outfalls seal and the same rain floods much worse. That's Mumbai's multiplier.</p>
       </div>
@@ -160,7 +197,7 @@
     <span id="storm-name">—</span>
     <span id="sb-window">WINDOW 00/12</span>
     <span id="sb-outbox">WA OUTBOX · SIM · 0</span>
-    <span class="right">FLOODLIGHT v0.3 · CX0404 · TEAM ALL STARS</span>
+    <span class="right">FLOODLIGHT v0.4 · CX0404 · TEAM ALL STARS</span>
   </footer>
 
   <script src="/static/vendor/leaflet/leaflet.js"></script>

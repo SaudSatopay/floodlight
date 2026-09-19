@@ -89,3 +89,38 @@ class LiveMCGMFeed:
 
 def live_mode_enabled() -> bool:
     return os.environ.get("FLOODLIGHT_MODE", "replay").lower() == "live"
+
+
+# --------------------------------------------------------------------------
+# Open-Meteo: genuinely live rainfall, no key, 15-minutely — the default
+# source for the dashboard's LIVE CITY view.
+# --------------------------------------------------------------------------
+
+def fetch_open_meteo(lat: float, lng: float) -> dict:
+    """Past 3 h + next 2 h of 15-minutely precipitation for a point.
+
+    Returns {"past": [12 × mm], "now": mm, "next": [8 × mm], "time": iso}.
+    Raises on network failure — callers decide how to degrade.
+    """
+    url = ("https://api.open-meteo.com/v1/forecast"
+           f"?latitude={lat:.4f}&longitude={lng:.4f}"
+           "&minutely_15=precipitation&past_minutely_15=12&forecast_minutely_15=9"
+           "&timezone=Asia%2FKolkata")
+    req = urllib.request.Request(url, headers={"User-Agent": "floodlight/0.3"})
+    with urllib.request.urlopen(req, timeout=20) as r:
+        data = json.load(r)
+    vals = [float(v or 0) for v in data["minutely_15"]["precipitation"]]
+    times = data["minutely_15"]["time"]
+    return {"past": vals[:12], "now": vals[12] if len(vals) > 12 else 0.0,
+            "next": vals[13:], "time": times[12] if len(times) > 12 else ""}
+
+
+def tide_estimate() -> float:
+    """Approximate semidiurnal tide for Mumbai (labelled EST in the UI) —
+    a 12.4 h cycle between ~1.2 m and ~4.4 m. Good enough to show the
+    outfall-lock concept live; production reads the port tide table."""
+    import datetime, math
+    now = datetime.datetime.now()
+    hours = now.hour + now.minute / 60.0
+    phase = (hours % 12.42) / 12.42 * 2 * math.pi
+    return round(2.8 + 1.6 * math.sin(phase), 1)

@@ -10,7 +10,7 @@
 <p align="center">
   <img alt="python" src="https://img.shields.io/badge/python-3.11+-4fc1d4?style=flat-square&labelColor=0b0d0f" />
   <img alt="fastapi" src="https://img.shields.io/badge/fastapi-SSE%20stream-e8eae6?style=flat-square&labelColor=0b0d0f" />
-  <img alt="tests" src="https://img.shields.io/badge/tests-18%20green-2bd576?style=flat-square&labelColor=0b0d0f" />
+  <img alt="tests" src="https://img.shields.io/badge/tests-20%20green-2bd576?style=flat-square&labelColor=0b0d0f" />
   <img alt="alerts" src="https://img.shields.io/badge/alerts-मर%20·%20हि%20·%20EN-e0a83c?style=flat-square&labelColor=0b0d0f" />
   <img alt="license" src="https://img.shields.io/badge/license-MIT-9aa3a7?style=flat-square&labelColor=0b0d0f" />
 </p>
@@ -75,16 +75,27 @@ python run.py
 # open http://localhost:8737 and press ▶ Run storm
 ```
 
-Two scenarios ship in the **Scenario** picker:
+**Three flood-famous wards × four real storm profiles** — every pairing replays through the same engine:
 
-- **08 July cloudburst · 205 mm/3 h** — the loud day: early warnings, tide-lock physics, the works.
-- **Quiet Tuesday · 75 mm/3 h** — the day that matters just as much: **zero street alerts** are sent
-  (no false alarms on an ordinary rainy day), and the blocked drain at Parel Tank Rd *still* gets caught
-  and dispatched. The negative case is demonstrated, not claimed.
+| | Areas (road-snapped OSM corridors) | Storms (15-min AWS cadence) |
+|---|---|---|
+| 1 | **Hindmata · Dadar–Parel (G/N)** — the city's most famous bowl | **08 July 2026 cloudburst · 205 mm** — the flagship run |
+| 2 | **Milan Subway · Andheri–Santacruz (K/E)** — the underpass that swallows cars | **26 July 2005 · the 944 mm day** — Mumbai's benchmark catastrophe |
+| 3 | **King's Circle · Gandhi Mkt–Sion (F/N)** — the market that floods first | **29 Aug 2017 · ~331 mm** — the day the city re-lived 2005 |
+| 4 | | **Quiet Tuesday · 75 mm** — the day whose only correct output is **silence** |
 
-Both run against the **Hindmata–Parel pilot belt** — 12 road-snapped street segments, 9 drains, scripted
-citizen WhatsApp traffic, and a level sensor at Hindmata Junction. Everything downstream of the inputs —
-hydrology, classification, alerting, dispatch — is the production code path.
+Flagship pairings carry hand-authored citizen traffic; every other pairing gets deterministic crowd
+scripts derived from the hydrology itself — pick any ward, throw any storm at it, the story still plays.
+On the quiet day, **zero healthy streets alert** and the blocked drain still gets caught — in *all three
+wards* (pinned by tests).
+
+### LIVE CITY — real rainfall, right now
+
+The **Live city** tab leaves the replay entirely: it pulls **real 15-minutely rainfall** for the active
+ward from [Open-Meteo](https://open-meteo.com) (keyless, genuinely live), shades the streets with the same
+hydrology fed today's actual rain, and draws the weather — **rain particles over the map scale with the
+real rain rate**, flooding streets run animated flow-lines, tide is an honest labelled estimate. Citizen
+reports and the hardware node stream in through the same channels as the replay.
 
 The dashboard is deliberately calm: a plain-language status line, four numbers, and a map. Everything else
 is tap-to-reveal — tap a street for its diagnosis card, open the Live feed tab for the raw log (citizen
@@ -129,7 +140,7 @@ Run the tests:
 python -m pytest tests/ -q
 ```
 
-Eighteen tests pin what the pitch claims: tide lock amplifies flooding · two surprising reports diagnose and
+Twenty tests pin what the pitch claims: tide lock amplifies flooding · two surprising reports diagnose and
 dispatch a blocked drain exactly once · a full replay produces early trilingual alerts with real lead time ·
 the quiet-day replay sends **zero** street alerts while still catching D-07 · WhatsApp payloads parse into
 reports (depth from "15cm" or "घुटनों तक") · a hardware sensor reading overrides the script · CV depth

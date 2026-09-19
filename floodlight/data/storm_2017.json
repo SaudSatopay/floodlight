@@ -1,0 +1,8 @@
+{
+  "name": "29 August 2017 · ~331 mm (peak-window reconstruction)",
+  "note": "The day Mumbai re-lived 2005's anxiety: ~331 mm in 12 h, transport down by evening. Reconstructed 3-hour peak window at AWS cadence with the day's moderate-high tide. Values synthesized from IMD/press records of the event.",
+  "start_clock": "13:30",
+  "window_min": 15,
+  "rain_mm":  [4, 9, 16, 24, 33, 38, 34, 26, 19, 12, 7, 4],
+  "tide_m":   [2.2, 2.5, 2.9, 3.3, 3.7, 4.0, 4.1, 4.0, 3.8, 3.5, 3.1, 2.8]
+}

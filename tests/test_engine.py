@@ -141,6 +141,40 @@ class TestCVDepth:
         assert len(set(results.values())) >= 2
 
 
+class TestAreaStormMatrix:
+    """Every pilot area × every storm must replay cleanly, and the blocked
+    drain must be diagnosed in ALL of them — that's the credibility grid."""
+
+    def test_every_combo_runs_and_catches_the_drain(self):
+        from floodlight.engine.replay import AREAS, STORMS
+        assert len(AREAS) >= 3 and len(STORMS) >= 4
+        for area in AREAS:
+            for storm in STORMS:
+                r = StormReplay(storm, area)
+                while not r.finished:
+                    snap = r.tick()
+                assert snap["kpis"]["drains_flagged"] >= 1, f"{area}×{storm}: drain missed"
+                if storm == "quiet":
+                    # Zero alerts on HEALTHY streets. The blocked street may
+                    # rightly be alerted — flooding there is real, not noise.
+                    blocked = AREAS[area]["blocked"]
+                    seg_drain = {s["id"]: s["drain"] for s in snap["segments"]}
+                    false_alarms = [a for a in snap["alerts"] if a["kind"] == "street"
+                                    and seg_drain.get(a["segment_id"]) != blocked]
+                    assert not false_alarms, f"{area}×quiet false-alarmed healthy streets"
+
+    def test_2005_outfloods_2017(self):
+        def alerts(storm):
+            r = StormReplay(storm, "hindmata")
+            while not r.finished:
+                snap = r.tick()
+            return snap["kpis"]["alerts_sent"], snap["kpis"]["people_warned"]
+        a05, p05 = alerts("monsoon-2005")
+        a17, p17 = alerts("monsoon-2017")
+        assert a05 >= a17
+        assert p05 >= p17
+
+
 class TestStormReplay:
     def setup_method(self):
         self.replay = StormReplay()

@@ -19,8 +19,12 @@ from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from .engine.livefeed import LiveMCGMFeed, live_mode_enabled
-from .engine.replay import STORMS, StormReplay
+import time as _time
+
+from .engine.hydrology import step_depth_cm
+from .engine.livefeed import (LiveMCGMFeed, fetch_open_meteo, live_mode_enabled,
+                              tide_estimate)
+from .engine.replay import AREAS, STORMS, StormReplay
 from .engine.whatsapp import Outbox, guess_depth_cm, parse_messages, verify_token
 
 STATIC = Path(__file__).resolve().parent / "static"
@@ -55,6 +59,7 @@ class Hub:
         snapshot["outbox"] = {"mode": "live" if self.outbox.live else "sim",
                               "sent": len(self.outbox.log)}
         snapshot["storms"] = [{"id": k, "label": v["label"]} for k, v in STORMS.items()]
+        snapshot["areas"] = [{"id": k, "label": v["label"]} for k, v in AREAS.items()]
         return snapshot
 
     async def broadcast(self, payload: dict) -> None:
@@ -88,9 +93,9 @@ class Hub:
     def pause(self) -> None:
         self.running = False
 
-    def reset(self, storm_id: str | None = None) -> None:
+    def reset(self, storm_id: str | None = None, area_id: str | None = None) -> None:
         self.running = False
-        self.replay.reset(storm_id)
+        self.replay.reset(storm_id, area_id)
         self._alerted_ids.clear()
 
     # ------------------------------------------------------------ live mode
@@ -145,11 +150,16 @@ async def index() -> FileResponse:
 
 @app.get("/api/meta")
 async def meta() -> JSONResponse:
+    area = AREAS[hub.replay.area_id]
     return JSONResponse({
-        "segments_geojson": json.loads((DATA / "ward_segments.geojson").read_text(encoding="utf-8")),
+        "segments_geojson": hub.replay.geojson,
         "drains": hub.replay.drain_points,
         "storms": [{"id": k, "label": v["label"]} for k, v in STORMS.items()],
+        "areas": [{"id": k, "label": v["label"]} for k, v in AREAS.items()],
         "active_storm": hub.replay.storm_id,
+        "active_area": hub.replay.area_id,
+        "area": {"label": area["label"], "center": area["center"], "zoom": area["zoom"],
+                 "sensor_seg": hub.replay.sensor_seg},
         "storm": {
             "name": hub.replay.storm["name"],
             "start_clock": hub.replay.storm["start_clock"],
@@ -177,7 +187,7 @@ async def control(req: Request) -> JSONResponse:
         hub.reset()
         await hub.broadcast(hub.stamped(hub.replay.snapshot()))
     elif action == "load":
-        hub.reset(body.get("storm", "cloudburst"))
+        hub.reset(body.get("storm"), body.get("area"))
         await hub.broadcast(hub.stamped(hub.replay.snapshot()))
     elif action == "speed":
         hub.speed = max(0.5, min(6.0, float(body.get("speed", 1.0))))
@@ -204,6 +214,56 @@ async def sensor(req: Request) -> JSONResponse:
     body = await req.json()
     hub.replay.set_sensor(body.get("segment", "amb-02"), float(body["depth_cm"]))
     return JSONResponse({"ok": True})
+
+
+_live_cache: dict = {"ts": 0.0, "payload": None}
+
+
+@app.get("/api/live")
+async def live_city() -> JSONResponse:
+    """LIVE CITY view: real 15-minutely rainfall (Open-Meteo, keyless) for
+    the active area, run through the same hydrology to shade the ward —
+    honestly labelled where a value is estimated."""
+    now = _time.time()
+    area = AREAS[hub.replay.area_id]
+    if (_live_cache["payload"] and now - _live_cache["ts"] < 60
+            and _live_cache["payload"]["area_label"] == area["label"]):
+        return JSONResponse(_live_cache["payload"])
+    lat, lng = area["center"]
+    degraded, met = False, None
+    loop = asyncio.get_running_loop()
+    try:
+        met = await loop.run_in_executor(None, fetch_open_meteo, lat, lng)
+    except Exception:
+        degraded = True
+        met = {"past": [0.0] * 12, "now": 0.0, "next": [0.0] * 8, "time": ""}
+
+    tide = tide_estimate()
+    # Stateless shading: run the past 3 h through the expected model with
+    # healthy drains — what today's real rain SHOULD be doing per street.
+    seg_rows = []
+    for sid, seg in hub.replay.segments.items():
+        drain = hub.replay.drains[seg.drain_id]
+        depth = 0.0
+        for mm in met["past"] + [met["now"]]:
+            depth = step_depth_cm(depth, mm, tide, seg, drain.capacity_mm, 0.05)
+        state = "alert" if depth >= seg.alert_cm else "watch" if depth >= seg.watch_cm else "ok"
+        seg_rows.append({"id": sid, "name": seg.name, "state": state,
+                         "expected_cm": round(depth, 1)})
+
+    payload = {
+        "updated": met["time"], "source": "open-meteo.com · 15-minutely",
+        "degraded": degraded,
+        "rain_now": round(met["now"], 2),
+        "past": [round(v, 2) for v in met["past"]],
+        "next": [round(v, 2) for v in met["next"]],
+        "past_3h_total": round(sum(met["past"]) + met["now"], 1),
+        "tide_est": tide,
+        "area_label": area["label"],
+        "segments": seg_rows,
+    }
+    _live_cache.update(ts=now, payload=payload)
+    return JSONResponse(payload)
 
 
 @app.get("/api/outbox")
