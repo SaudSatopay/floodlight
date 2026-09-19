@@ -63,11 +63,15 @@ function applySegStyle(id, row) {
   trio.under.setStyle({ color: CASING.color, opacity: CASING.opacity, weight: w + 3.5 });
   trio.core.setStyle({ color: st.core[0], opacity: st.core[1], weight: w, dashArray: st.dash || null });
   const flowing = row && (row.state === "watch" || row.state === "alert" || row.state === "blocked");
-  trio.flow.setStyle({ opacity: flowing ? 0.55 : 0 });
+  trio.flow.setStyle({ opacity: flowing ? 0.85 : 0, weight: flowing && row.state !== "watch" ? 2.2 : 1.7 });
   const el = trio.core.getElement();
   if (el) el.setAttribute("class", `leaflet-interactive segcore ${st.cls || ""}`);
   const fe = trio.flow.getElement();
-  if (fe) fe.setAttribute("class", "leaflet-interactive flowline");
+  if (fe) {
+    fe.setAttribute("class", "leaflet-interactive flowline");
+    fe.style.animationDuration = row && row.state === "alert" ? "0.65s"
+      : row && row.state === "blocked" ? "0.9s" : "1.3s";
+  }
 }
 
 function segRows() {
@@ -115,7 +119,7 @@ function buildArea(meta) {
       lineCap: "round", lineJoin: "round", className: "segcore",
     }).addTo(map);
     const flow = L.polyline(latlngs, {
-      color: "#dff6fb", opacity: 0, weight: 1.5, dashArray: "2 12",
+      color: "#eafbff", opacity: 0, weight: 1.7, dashArray: "3 11",
       lineCap: "round", lineJoin: "round", className: "flowline", interactive: false,
     }).addTo(map);
     state.layers[id] = { under, core, flow };
@@ -166,61 +170,133 @@ async function refreshMeta() {
   fill($("area-sel"), meta.areas, meta.active_area);
 }
 
-/* ------------------------------------------------------- rain particles */
+/* --------------------------------------------------- weather FX engine */
+/* Three parallax rain layers, splash arcs, lightning on cloudburst
+   windows, ripple rings on flooded streets, a radar ring on the sensor.
+   Intensity is DATA-DRIVEN (replay rain_now, or real live rain); the
+   FX PREVIEW button cranks visuals only, clearly labelled. */
 
-const fx = { canvas: null, ctx: null, drops: [], splashes: [], intensity: 0, last: 0 };
+const fx = {
+  canvas: null, ctx: null, intensity: 0,
+  layers: [
+    { drops: [], mult: 5, spd: 7,  len: 8,  alpha: 0.22, w: 1.0, drift: 0.22 },   // far
+    { drops: [], mult: 6, spd: 11, len: 13, alpha: 0.42, w: 1.4, drift: 0.28 },   // mid
+    { drops: [], mult: 5, spd: 16, len: 20, alpha: 0.62, w: 1.9, drift: 0.34 },   // near
+  ],
+  splashes: [], ripples: [], flash: 0, previewUntil: 0,
+  lastRipple: 0, lastSensor: 0,
+};
 
 function fxIntensity() {
-  const mm = state.mode === "live"
-    ? (state.live ? state.live.rain_now * 4 : 0)   // live mm/15min are small — scale for visibility
-    : (state.snap && state.running !== false ? state.snap.rain_now : (state.snap ? state.snap.rain_now : 0));
+  let mm = state.mode === "live"
+    ? (state.live ? state.live.rain_now * 4 : 0)
+    : (state.snap ? state.snap.rain_now : 0);
+  if (Date.now() < fx.previewUntil) {
+    const left = (fx.previewUntil - Date.now()) / 1000;
+    mm = Math.max(mm, left > 16 ? (20 - left) * 11 : left > 5 ? 44 : left * 8);
+  }
   return Math.max(0, Math.min(48, mm));
 }
 
-function fxLoop(ts) {
+function spawnRipple(x, y, color, max = 26) {
+  fx.ripples.push({ x, y, r: 2, a: 0.55, color, max });
+}
+
+function floodedContainerPoints() {
+  const pts = [];
+  for (const row of segRows()) {
+    if (row.state === "alert" || row.state === "blocked" || row.state === "watch") {
+      const trio = state.layers[row.id];
+      if (!trio) continue;
+      const ll = trio.core.getLatLngs();
+      pts.push({ ll: ll[Math.floor(Math.random() * ll.length)], hot: row.state !== "watch" });
+    }
+  }
+  return pts;
+}
+
+function fxLoop() {
   const c = fx.canvas, ctx = fx.ctx;
   if (!c) return;
   if (c.width !== c.clientWidth || c.height !== c.clientHeight) {
     c.width = c.clientWidth; c.height = c.clientHeight;
   }
   const target = fxIntensity();
-  fx.intensity += (target - fx.intensity) * 0.04;         // ease toward real value
-  const want = Math.round(fx.intensity * 9);              // drops on screen
-
-  while (fx.drops.length < want) {
-    fx.drops.push({
-      x: Math.random() * (c.width + 120) - 60,
-      y: Math.random() * -c.height,
-      len: 9 + Math.random() * 13,
-      spd: 9 + Math.random() * 7,
-    });
-  }
-  if (fx.drops.length > want) fx.drops.length = want;
-
+  fx.intensity += (target - fx.intensity) * 0.05;
   ctx.clearRect(0, 0, c.width, c.height);
-  if (fx.drops.length) {
-    ctx.strokeStyle = "rgba(160, 208, 222, 0.5)";
-    ctx.lineWidth = 1.4;
+  const now = Date.now();
+
+  // rain — three parallax layers
+  for (const L of fx.layers) {
+    const want = Math.round(fx.intensity * L.mult);
+    while (L.drops.length < want) {
+      L.drops.push({ x: Math.random() * (c.width + 160) - 80, y: Math.random() * -c.height,
+                     j: 0.75 + Math.random() * 0.5 });
+    }
+    if (L.drops.length > want) L.drops.length = want;
+    if (!L.drops.length) continue;
+    ctx.strokeStyle = `rgba(168, 214, 228, ${L.alpha})`;
+    ctx.lineWidth = L.w;
     ctx.beginPath();
-    for (const d of fx.drops) {
+    for (const d of L.drops) {
+      const len = L.len * d.j, spd = L.spd * d.j;
       ctx.moveTo(d.x, d.y);
-      ctx.lineTo(d.x - d.len * 0.28, d.y + d.len);
-      d.x -= d.spd * 0.28; d.y += d.spd;
+      ctx.lineTo(d.x - len * L.drift, d.y + len);
+      d.x -= spd * L.drift; d.y += spd;
       if (d.y > c.height) {
-        if (Math.random() < 0.3) fx.splashes.push({ x: d.x, y: c.height - 2, r: 1, a: 0.5 });
-        d.y = -12 - Math.random() * 60;
-        d.x = Math.random() * (c.width + 120) - 30;
+        if (L.spd >= 14 && Math.random() < 0.5)
+          fx.splashes.push({ x: d.x, y: c.height - 2 - Math.random() * 24, r: 1, a: 0.5 });
+        d.y = -14 - Math.random() * 80;
+        d.x = Math.random() * (c.width + 160) - 40;
       }
     }
     ctx.stroke();
-    for (let i = fx.splashes.length - 1; i >= 0; i--) {
-      const s = fx.splashes[i];
-      ctx.strokeStyle = `rgba(155, 200, 214, ${s.a})`;
-      ctx.beginPath(); ctx.arc(s.x, s.y, s.r, Math.PI, 2 * Math.PI); ctx.stroke();
-      s.r += 0.7; s.a -= 0.045;
-      if (s.a <= 0) fx.splashes.splice(i, 1);
+  }
+
+  // splash arcs
+  for (let i = fx.splashes.length - 1; i >= 0; i--) {
+    const s = fx.splashes[i];
+    ctx.strokeStyle = `rgba(168, 214, 228, ${s.a})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(s.x, s.y, s.r, Math.PI, 2 * Math.PI); ctx.stroke();
+    s.r += 0.8; s.a -= 0.05;
+    if (s.a <= 0) fx.splashes.splice(i, 1);
+  }
+
+  // ripple rings on flooded streets (water breathing)
+  if (now - fx.lastRipple > 620) {
+    fx.lastRipple = now;
+    const pts = floodedContainerPoints();
+    if (pts.length) {
+      const p = pts[Math.floor(Math.random() * pts.length)];
+      const cp = map.latLngToContainerPoint(p.ll);
+      spawnRipple(cp.x, cp.y, p.hot ? "228, 122, 108" : "224, 168, 60");
     }
   }
+  // radar ring on the sensor — the instrument is alive even when dry
+  if (state.sensorMarker && now - fx.lastSensor > 2600) {
+    fx.lastSensor = now;
+    const cp = map.latLngToContainerPoint(state.sensorMarker.getLatLng());
+    spawnRipple(cp.x, cp.y, "79, 193, 212", 34);
+  }
+  for (let i = fx.ripples.length - 1; i >= 0; i--) {
+    const r = fx.ripples[i];
+    ctx.strokeStyle = `rgba(${r.color}, ${r.a})`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(r.x, r.y, r.r, 0, 2 * Math.PI); ctx.stroke();
+    r.r += r.max > 30 ? 0.55 : 0.8; r.a -= r.max > 30 ? 0.012 : 0.02;
+    if (r.a <= 0 || r.r > r.max) fx.ripples.splice(i, 1);
+  }
+
+  // lightning during cloudburst windows
+  if (fx.intensity >= 26 && Math.random() < 0.004) fx.flash = 0.5 + Math.random() * 0.3;
+  if (fx.flash > 0.01) {
+    ctx.fillStyle = `rgba(222, 238, 248, ${fx.flash * 0.55})`;
+    ctx.fillRect(0, 0, c.width, c.height);
+    fx.flash *= Math.random() < 0.12 ? 1.6 : 0.8;      // occasional double-strike
+    if (fx.flash > 0.9) fx.flash = 0.9;
+  } else fx.flash = 0;
+
   requestAnimationFrame(fxLoop);
 }
 
@@ -250,10 +326,17 @@ function renderTop() {
   $("storm-name").textContent = `${s.area_label} · ${s.storm_name}`;
   $("sb-outbox").textContent = `WA OUTBOX · ${s.outbox.mode.toUpperCase()} · ${s.outbox.sent}`;
 
-  $("k-alerts").textContent = s.kpis.alerts_sent;
-  $("k-people").textContent = s.kpis.people_warned.toLocaleString("en-IN");
-  $("k-lead").innerHTML = `${s.kpis.avg_lead_min}<small> min</small>`;
-  $("k-drains").textContent = s.kpis.drains_flagged;
+  const setKpi = (id, html) => {
+    const el = $(id);
+    if (el.innerHTML !== html) {
+      el.innerHTML = html;
+      el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop");
+    }
+  };
+  setKpi("k-alerts", String(s.kpis.alerts_sent));
+  setKpi("k-people", s.kpis.people_warned.toLocaleString("en-IN"));
+  setKpi("k-lead", `${s.kpis.avg_lead_min}<small> min</small>`);
+  setKpi("k-drains", String(s.kpis.drains_flagged));
 
   const badge = $("node-badge");
   badge.textContent = s.node_live ? "LIVE HARDWARE" : "SIMULATED";
@@ -640,6 +723,11 @@ $("composer-toggle").onclick = () => {
   $("composer-toggle").textContent = body.hidden ? "＋ File a citizen report" : "－ Close report form";
 };
 $("hint-x").onclick = () => { state.hintsOn = false; $("hintbar").style.display = "none"; };
+$("fx-preview").onclick = () => {
+  fx.previewUntil = Date.now() + 20000;
+  $("fx-preview").textContent = "Downpour FX running… (visuals only)";
+  setTimeout(() => ($("fx-preview").textContent = "☔ Preview downpour FX (visuals only)"), 20500);
+};
 
 const depthInput = $("rep-depth");
 depthInput.oninput = () => ($("rep-depth-val").textContent = `${depthInput.value} cm`);
