@@ -33,15 +33,29 @@ L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
   maxZoom: 19,
 }).addTo(map);
 
-function segStyle(row) {
-  const st = row ? row.state : "ok";
-  return {
-    color: st === "ok" ? "#4a5b9e" : COLORS[st],
-    weight: st === "ok" ? 6 : 9,
-    opacity: st === "ok" ? 0.85 : 0.97,
-    dashArray: st === "blocked" ? "9 7" : null,
-    lineCap: "round",
-  };
+/* Neon-glow street rendering: every segment is TWO strokes — a wide,
+   faint under-glow and a bright core (with a CSS drop-shadow bloom).
+   Dry streets stay quiet indigo veins; live states light up like signal. */
+const SEG_STYLES = {
+  ok:      { under: ["#26305e", 0.16, 9],  core: ["#5a68a8", 0.70, 3.5], cls: "seg-ok" },
+  watch:   { under: ["#ffb020", 0.18, 12], core: ["#ffc86a", 0.95, 5.0], cls: "seg-watch" },
+  alert:   { under: ["#ff3860", 0.22, 14], core: ["#ff8095", 0.97, 5.5], cls: "seg-alert" },
+  blocked: { under: ["#ffb020", 0.20, 13], core: ["#ffd48a", 0.95, 5.0], cls: "seg-blocked", dash: "0.1 11" },
+};
+
+function applySegStyle(id, row) {
+  const pair = state.layers[id];
+  if (!pair) return;
+  const st = SEG_STYLES[row ? row.state : "ok"];
+  const depth = row ? Math.max(row.expected_cm, row.observed_cm || 0) : 0;
+  const swell = Math.min(2.2, depth / 16);          // streets swell as water rises
+  pair.under.setStyle({ color: st.under[0], opacity: st.under[1], weight: st.under[2] + swell * 2 });
+  pair.core.setStyle({
+    color: st.core[0], opacity: st.core[1], weight: st.core[2] + swell,
+    dashArray: st.dash || null,
+  });
+  const el = pair.core.getElement();
+  if (el) el.setAttribute("class", `leaflet-interactive segcore ${st.cls}`);
 }
 
 // Leaflet measures its container at construction; flex layout can settle
@@ -64,28 +78,39 @@ async function initMeta() {
   state.meta = meta;
   document.getElementById("storm-name").textContent = meta.storm.name;
 
-  L.geoJSON(meta.segments_geojson, {
-    style: () => segStyle(null),
-    onEachFeature: (f, layer) => {
-      const id = f.properties.id;
-      state.layers[id] = layer;
-      layer.on("click", () => { state.focusSeg = id; renderEngineCard(); });
-      layer.bindPopup(() => {
-        const row = currentRow(id);
-        return row ? popupHtml(row) : f.properties.name;
-      });
-    },
-  }).addTo(map);
+  // Under-glows first (their own pane, beneath every core stroke).
+  map.createPane("glow");
+  map.getPane("glow").style.zIndex = 398;
+
+  for (const f of meta.segments_geojson.features) {
+    const id = f.properties.id;
+    const latlngs = f.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
+    const under = L.polyline(latlngs, {
+      pane: "glow", color: "#26305e", opacity: 0.16, weight: 9,
+      lineCap: "round", lineJoin: "round", interactive: false,
+    }).addTo(map);
+    const core = L.polyline(latlngs, {
+      color: "#5a68a8", opacity: 0.7, weight: 3.5,
+      lineCap: "round", lineJoin: "round", className: "segcore seg-ok",
+    }).addTo(map);
+    state.layers[id] = { under, core };
+    core.on("click", () => { state.focusSeg = id; renderEngineCard(); });
+    core.bindPopup(() => {
+      const row = currentRow(id);
+      return row ? popupHtml(row) : f.properties.name;
+    });
+  }
 
   for (const d of meta.drains) {
     state.drainMarkers[d.id] = L.circleMarker([d.lat, d.lng], {
-      radius: 5, color: "#5b8dfc", fillColor: "#0c0f22", fillOpacity: 1, weight: 2,
+      radius: 4.5, color: "#6d79c4", fillColor: "#0c0f22", fillOpacity: 1, weight: 1.5,
     }).addTo(map).bindTooltip(`${d.id} · ${d.name}`, { direction: "top" });
   }
 
-  // The optional ₹2k ultrasonic node at Hindmata Junction.
+  // The optional ₹2k ultrasonic node at Hindmata Junction — soft cyan pulse.
   L.circleMarker([19.0154, 72.84465], {
-    radius: 6, color: COLORS.cyan, fillColor: COLORS.cyan, fillOpacity: 0.9, weight: 2,
+    radius: 5.5, color: COLORS.cyan, fillColor: COLORS.cyan, fillOpacity: 0.85, weight: 2,
+    className: "sensor-dot",
   }).addTo(map).bindTooltip("ultrasonic level sensor · Hindmata Jn", { direction: "top" });
 
   const sel = document.getElementById("rep-seg");
@@ -105,17 +130,19 @@ function currentRow(id) {
 }
 
 function renderMap() {
-  for (const row of state.snap.segments) {
-    const layer = state.layers[row.id];
-    if (layer) layer.setStyle(segStyle(row));
-  }
+  for (const row of state.snap.segments) applySegStyle(row.id, row);
   for (const d of state.snap.drains) {
     const m = state.drainMarkers[d.id];
     if (!m) continue;
+    const hot = d.dispatched || d.health < 60;
     m.setStyle({
-      color: d.dispatched ? COLORS.watch : d.health < 60 ? COLORS.watch : "#5b8dfc",
-      radius: d.dispatched ? 7 : 5,
+      color: hot ? COLORS.watch : "#6d79c4",
+      fillColor: hot ? "#2a1c08" : "#0c0f22",
+      weight: hot ? 2 : 1.5,
+      radius: hot ? 6 : 4.5,
     });
+    const el = m.getElement();
+    if (el) el.setAttribute("class", `leaflet-interactive ${hot ? "drain-hot" : ""}`);
   }
 }
 

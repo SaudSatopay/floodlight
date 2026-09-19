@@ -85,6 +85,20 @@ small { font-size: .62em; color: var(--mut); }
 #map-wrap { flex: 1.45; position: relative; }
 #map { position: absolute; inset: 0; background: #070915; }
 .dark-tiles { filter: invert(1) hue-rotate(190deg) brightness(0.62) contrast(1.15) saturate(0.35); }
+
+/* Neon street strokes: bloom per state; blocked drains march amber beads. */
+.segcore { transition: stroke 0.4s, stroke-width 0.4s; }
+.seg-watch { filter: drop-shadow(0 0 4px rgba(255, 176, 32, 0.55)); }
+.seg-alert { filter: drop-shadow(0 0 7px rgba(255, 56, 96, 0.65)); }
+.seg-blocked {
+  filter: drop-shadow(0 0 5px rgba(255, 200, 106, 0.7));
+  stroke-linecap: round;
+  animation: beadmarch 1.5s linear infinite;
+}
+@keyframes beadmarch { to { stroke-dashoffset: -22.2; } }
+.sensor-dot { filter: drop-shadow(0 0 6px rgba(63, 208, 255, 0.85)); animation: sensorpulse 2.4s ease-in-out infinite; }
+@keyframes sensorpulse { 50% { fill-opacity: 0.35; stroke-opacity: 0.5; } }
+.drain-hot { filter: drop-shadow(0 0 5px rgba(255, 176, 32, 0.8)); }
 .leaflet-container { font: inherit; }
 
 .panel {
@@ -99,10 +113,10 @@ small { font-size: .62em; color: var(--mut); }
   display: flex; flex-direction: column; gap: 5px; font-size: 10px; color: var(--mut);
 }
 .sw { display: inline-block; width: 18px; height: 5px; border-radius: 3px; margin-right: 7px; vertical-align: middle; }
-.sw.ok { background: #33406f; }
-.sw.watch { background: var(--amber); }
-.sw.alert { background: var(--red); }
-.sw.blocked { background: repeating-linear-gradient(90deg, var(--amber) 0 4px, transparent 4px 7px); }
+.sw.ok { background: #5a68a8; opacity: 0.75; }
+.sw.watch { background: #ffc86a; box-shadow: 0 0 6px rgba(255, 176, 32, 0.7); }
+.sw.alert { background: #ff8095; box-shadow: 0 0 7px rgba(255, 56, 96, 0.75); }
+.sw.blocked { background: repeating-linear-gradient(90deg, #ffd48a 0 3px, transparent 3px 9px); border-radius: 3px; box-shadow: 0 0 6px rgba(255, 200, 106, 0.6); }
 .sw.sensor { background: var(--cyan); width: 8px; height: 8px; border-radius: 50%; }
 
 #engine-card { position: absolute; right: 14px; top: 14px; z-index: 900; width: 330px; }
