@@ -75,19 +75,22 @@ python run.py
 # open http://localhost:8737 and press ▶ Run storm
 ```
 
-**Three flood-famous wards × four real storm profiles** — every pairing replays through the same engine:
+**Eight flood-famous corridors across the Mumbai Metropolitan Region × four real storm profiles** — every
+pairing replays through the same engine. Island city to the northern suburbs and across the creek:
+Hindmata, Milan Subway, King's Circle, **Kurla**, **Mulund**, **Borivali–Dahisar**, **Thane** and
+**Mira Road** — all road-snapped from OSM, each with its own drains and its own notorious blockage:
 
 | | Areas (road-snapped OSM corridors) | Storms (15-min AWS cadence) |
 |---|---|---|
-| 1 | **Hindmata · Dadar–Parel (G/N)** — the city's most famous bowl | **08 July 2026 cloudburst · 205 mm** — the flagship run |
-| 2 | **Milan Subway · Andheri–Santacruz (K/E)** — the underpass that swallows cars | **26 July 2005 · the 944 mm day** — Mumbai's benchmark catastrophe |
-| 3 | **King's Circle · Gandhi Mkt–Sion (F/N)** — the market that floods first | **29 Aug 2017 · ~331 mm** — the day the city re-lived 2005 |
-| 4 | | **Quiet Tuesday · 75 mm** — the day whose only correct output is **silence** |
+| MCGM wards | Hindmata · Milan Subway · King's Circle · Kurla · Mulund · Borivali–Dahisar | **08 July 2026 cloudburst · 205 mm** — the flagship run |
+| Beyond the city | **Thane (TMC)** · **Mira Road (MBMC)** | **26 July 2005 · the 944 mm day** — Mumbai's benchmark catastrophe |
+| Live region strip | every corridor's REAL rain + risk right now, tap to jump | **29 Aug 2017 · ~331 mm** — the day the city re-lived 2005 |
+| | | **Quiet Tuesday · 75 mm** — the day whose only correct output is **silence** |
 
 Flagship pairings carry hand-authored citizen traffic; every other pairing gets deterministic crowd
 scripts derived from the hydrology itself — pick any ward, throw any storm at it, the story still plays.
-On the quiet day, **zero healthy streets alert** and the blocked drain still gets caught — in *all three
-wards* (pinned by tests).
+On the quiet day, **zero healthy streets alert** and the blocked drain still gets caught — in *all eight
+corridors* (pinned by tests — the matrix runs 32 replays).
 
 ### LIVE CITY — real rainfall, right now
 
@@ -95,7 +98,7 @@ The **Live city** tab leaves the replay entirely: it pulls **real 15-minutely ra
 ward from [Open-Meteo](https://open-meteo.com) (keyless, genuinely live), shades the streets with the same
 hydrology fed today's actual rain, and draws the weather — **rain particles over the map scale with the
 real rain rate**, flooding streets run animated flow-lines, tide is an honest labelled estimate — and a
-**rain heatmap** paints precipitation across Greater Mumbai from a 30-point Open-Meteo grid (in replay
+**rain heatmap** paints precipitation across Greater Mumbai from a 42-point Open-Meteo grid spanning the whole MMR (in replay
 mode the heat layer shows waterlogging depth instead). Citizen reports and the hardware node stream in
 through the same channels as the replay.
 

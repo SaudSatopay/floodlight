@@ -348,6 +348,16 @@ small { font-size: 0.68em; color: var(--sub); font-weight: 400; }
 .ls-name { flex: 1; font-size: 11.5px; font-weight: 500; color: var(--paper); }
 .ls-cm { font-family: var(--mono); font-size: 10.5px; color: var(--sub); }
 
+#region-cov { padding: 12px 16px 4px; border-top: 1px solid var(--hair2); }
+.region-row {
+  display: flex; align-items: center; gap: 10px; padding: 8px 10px; margin-top: 6px;
+  background: var(--raise); border: 1px solid var(--hair2); border-radius: 2px; cursor: pointer;
+}
+.region-row:hover { border-color: var(--faint); }
+.rr-risk { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 13px; font-weight: 600; width: 44px; }
+.rr-name { flex: 1; font-size: 11px; font-weight: 500; color: var(--paper); }
+.rr-rain { font-family: var(--mono); font-size: 9px; color: var(--faint); }
+
 .live-note { margin: 12px 16px 6px; font-size: 10.5px; line-height: 1.6; color: var(--faint); }
 .live-note b { color: var(--sub); }
 #live-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--teal); margin-left: 5px; vertical-align: 2px; animation: livepulse 1.8s ease-in-out infinite; }

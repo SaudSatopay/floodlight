@@ -1,0 +1,47 @@
+{
+ "drains": [
+  {
+   "id": "KU-D1",
+   "name": "Stn market sump (Mithi backflow)",
+   "capacity_mm": 19,
+   "lat": 19.065,
+   "lng": 72.8782
+  },
+  {
+   "id": "KU-D2",
+   "name": "Kamani line",
+   "capacity_mm": 22,
+   "lat": 19.068,
+   "lng": 72.8808
+  },
+  {
+   "id": "KU-D3",
+   "name": "Kalina Jn line",
+   "capacity_mm": 23,
+   "lat": 19.072,
+   "lng": 72.8838
+  },
+  {
+   "id": "KU-D4",
+   "name": "CST Rd-Mithi outfall",
+   "capacity_mm": 21,
+   "lat": 19.0712,
+   "lng": 72.8765
+  },
+  {
+   "id": "KU-D5",
+   "name": "Halav Pul lateral",
+   "capacity_mm": 22,
+   "lat": 19.0632,
+   "lng": 72.878
+  }
+ ],
+ "sensor_seg": "stn-w",
+ "blocked": "KU-D1",
+ "center": [
+  19.0685,
+  72.88
+ ],
+ "zoom": 15,
+ "label": "Kurla · Stn-LBS-CST Rd (L ward)"
+}

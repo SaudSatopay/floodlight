@@ -135,14 +135,38 @@ def fetch_open_meteo_grid(points: list[tuple[float, float]]) -> list[dict]:
 
 
 def mumbai_grid() -> list[tuple[float, float]]:
-    """A coarse grid over Greater Mumbai for the live rain heatmap."""
+    """A coarse grid over the whole Mumbai Metropolitan Region — island
+    city to Dahisar, Kurla to Mulund, and across the creek to Thane and
+    Mira-Bhayandar — for the live rain heatmap."""
     pts = []
-    lat0, lat1, lng0, lng1 = 18.90, 19.30, 72.78, 73.00
-    for i in range(6):
-        for j in range(5):
-            pts.append((round(lat0 + (lat1 - lat0) * i / 5, 3),
-                        round(lng0 + (lng1 - lng0) * j / 4, 3)))
+    lat0, lat1, lng0, lng1 = 18.90, 19.48, 72.76, 73.06
+    for i in range(7):
+        for j in range(6):
+            pts.append((round(lat0 + (lat1 - lat0) * i / 6, 3),
+                        round(lng0 + (lng1 - lng0) * j / 5, 3)))
     return pts
+
+
+def fetch_open_meteo_region(points: list[tuple[float, float]]) -> list[dict]:
+    """Past-3h + current precipitation for several points (area centres)
+    in ONE call — powers the MMR coverage strip."""
+    lats = ",".join(f"{p[0]:.4f}" for p in points)
+    lngs = ",".join(f"{p[1]:.4f}" for p in points)
+    url = ("https://api.open-meteo.com/v1/forecast"
+           f"?latitude={lats}&longitude={lngs}"
+           "&minutely_15=precipitation&past_minutely_15=12&forecast_minutely_15=5"
+           "&timezone=Asia%2FKolkata")
+    req = urllib.request.Request(url, headers={"User-Agent": "floodlight/0.5"})
+    with urllib.request.urlopen(req, timeout=25) as r:
+        data = json.load(r)
+    rows = data if isinstance(data, list) else [data]
+    out = []
+    for p, row in zip(points, rows):
+        vals = [float(v or 0) for v in row.get("minutely_15", {}).get("precipitation", [0] * 13)]
+        out.append({"lat": p[0], "lng": p[1],
+                    "past": vals[:12], "now": vals[12] if len(vals) > 12 else 0.0,
+                    "next": vals[13:]})
+    return out
 
 
 def tide_estimate() -> float:

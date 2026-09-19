@@ -1,0 +1,47 @@
+{
+ "drains": [
+  {
+   "id": "BO-D1",
+   "name": "Stn (W) collector",
+   "capacity_mm": 23,
+   "lat": 19.23,
+   "lng": 72.8562
+  },
+  {
+   "id": "BO-D2",
+   "name": "Dahisar bdry line",
+   "capacity_mm": 24,
+   "lat": 19.236,
+   "lng": 72.8548
+  },
+  {
+   "id": "BO-D3",
+   "name": "Chandavarkar line",
+   "capacity_mm": 23,
+   "lat": 19.2315,
+   "lng": 72.8575
+  },
+  {
+   "id": "BO-D4",
+   "name": "L.T. Rd line",
+   "capacity_mm": 22,
+   "lat": 19.2288,
+   "lng": 72.854
+  },
+  {
+   "id": "BO-D5",
+   "name": "Dahisar subway sump",
+   "capacity_mm": 20,
+   "lat": 19.2392,
+   "lng": 72.8552
+  }
+ ],
+ "sensor_seg": "dahisar-sub",
+ "blocked": "BO-D5",
+ "center": [
+  19.233,
+  72.8562
+ ],
+ "zoom": 15,
+ "label": "Borivali-Dahisar · S.V. Rd belt (R/C)"
+}

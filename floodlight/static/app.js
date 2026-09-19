@@ -25,6 +25,9 @@ const state = {
   heatOn: true,
   heatLayer: null,
   riskPin: null,
+  region: null,
+  regionMarkers: [],
+  regionTimer: null,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -659,11 +662,68 @@ async function pollLive() {
   renderEngineCard();
 }
 
+const TIER_COL = { HIGH: "#e4574c", MODERATE: "#e0a83c", LOW: "#4fc1d4" };
+
+async function pollRegion() {
+  try {
+    state.region = await (await fetch("/api/region")).json();
+  } catch { return; }
+  const list = $("region-list");
+  if (!list) return;
+  $("region-upd").textContent = state.region.degraded ? "feed degraded" : `updated ${state.region.updated}`;
+  list.innerHTML = "";
+  const rows = [...state.region.areas].sort((a, b) => b.risk_pct - a.risk_pct);
+  for (const a of rows) {
+    const div = document.createElement("div");
+    div.className = "region-row";
+    div.innerHTML = `<span class="rr-risk" style="color:${TIER_COL[a.tier]}">${a.risk_pct}%</span>
+      <span class="rr-name">${a.label}</span>
+      <span class="rr-rain">${a.rain_now.toFixed(1)} mm ·  3h ${a.past_3h.toFixed(1)}</span>`;
+    div.onclick = async () => {
+      clearLocalRun();
+      await control({ action: "load", area: a.id });
+      await refreshMeta();
+      pollLive();
+      map.setView(a.center, 15);
+    };
+    list.appendChild(div);
+  }
+
+  // region markers on the map (live mode only)
+  for (const m of state.regionMarkers) map.removeLayer(m);
+  state.regionMarkers = [];
+  if (state.mode !== "live") return;
+  for (const a of state.region.areas) {
+    const col = TIER_COL[a.tier];
+    const m = L.circleMarker(a.center, {
+      radius: 6 + a.risk_pct / 14, color: col, weight: 2,
+      fillColor: col, fillOpacity: 0.25, bubblingMouseEvents: false,
+    }).addTo(map)
+      .bindTooltip(`${a.label} — ${a.risk_pct}% · ${a.rain_now.toFixed(1)} mm now`, { direction: "top" });
+    m.on("click", async () => {
+      clearLocalRun();
+      await control({ action: "load", area: a.id });
+      await refreshMeta();
+      pollLive();
+      map.setView(a.center, 15);
+    });
+    state.regionMarkers.push(m);
+  }
+}
+
 function enterLive() {
   state.mode = "live";
   $("live-dot").hidden = false;
   pollLive();
+  pollRegion();
   if (!state.liveTimer) state.liveTimer = setInterval(pollLive, 60000);
+  if (!state.regionTimer) state.regionTimer = setInterval(pollRegion, 120000);
+  // pull back to the whole Mumbai Metropolitan Region
+  if (state.region && state.region.areas.length) {
+    map.fitBounds(L.latLngBounds(state.region.areas.map((a) => a.center)).pad(0.18));
+  } else {
+    map.setView([19.16, 72.92], 11);
+  }
   renderMap();
   renderHints();
   $("sb-live").textContent = "LIVE CITY";
@@ -671,6 +731,10 @@ function enterLive() {
 
 function exitLive() {
   state.mode = "replay";
+  for (const m of state.regionMarkers) map.removeLayer(m);
+  state.regionMarkers = [];
+  if (state.regionTimer) { clearInterval(state.regionTimer); state.regionTimer = null; }
+  if (state.meta) map.setView(state.meta.area.center, state.meta.area.zoom);
   renderMap();
   if (state.snap) renderTop();
 }

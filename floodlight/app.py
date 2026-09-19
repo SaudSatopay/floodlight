@@ -22,8 +22,10 @@ from fastapi.staticfiles import StaticFiles
 import time as _time
 
 from .engine.hydrology import step_depth_cm
+from .engine.hydrology import Segment
 from .engine.livefeed import (LiveMCGMFeed, fetch_open_meteo, fetch_open_meteo_grid,
-                              live_mode_enabled, mumbai_grid, tide_estimate)
+                              fetch_open_meteo_region, live_mode_enabled, mumbai_grid,
+                              tide_estimate)
 from .engine.replay import AREAS, STORMS, StormReplay
 from .engine.whatsapp import Outbox, guess_depth_cm, parse_messages, verify_token
 
@@ -270,6 +272,67 @@ async def live_city() -> JSONResponse:
         "heat": heat,
     }
     _live_cache.update(ts=now, payload=payload)
+    return JSONResponse(payload)
+
+
+def _area_probe(area_id: str) -> tuple[Segment, float]:
+    """The area's most bowl-shaped street + its drain capacity (cached) —
+    a cheap regional risk proxy."""
+    if not hasattr(_area_probe, "cache"):
+        _area_probe.cache = {}
+    if area_id not in _area_probe.cache:
+        d = AREAS[area_id]["dir"]
+        geo = json.loads((d / "segments.geojson").read_text(encoding="utf-8"))
+        drains = json.loads((d / "drains.json").read_text(encoding="utf-8"))["drains"]
+        f = max(geo["features"], key=lambda x: x["properties"]["bowl"])
+        p = f["properties"]
+        seg = Segment(id=p["id"], name=p["name"], bowl=p["bowl"],
+                      drain_id=p["drain_id"], subscribers=p["subscribers"])
+        cap = next((x["capacity_mm"] for x in drains if x["id"] == seg.drain_id), 22)
+        _area_probe.cache[area_id] = (seg, cap)
+    return _area_probe.cache[area_id]
+
+
+_region_cache: dict = {"ts": 0.0, "payload": None}
+
+
+@app.get("/api/region")
+async def region() -> JSONResponse:
+    """MMR coverage strip: every pilot corridor's REAL rain right now and
+    the risk it implies on that corridor's worst street."""
+    import math as _math
+    now = _time.time()
+    if _region_cache["payload"] and now - _region_cache["ts"] < 120:
+        return JSONResponse(_region_cache["payload"])
+
+    ids = list(AREAS.keys())
+    centers = [tuple(AREAS[a]["center"]) for a in ids]
+    loop = asyncio.get_running_loop()
+    degraded, met = False, None
+    try:
+        met = await loop.run_in_executor(None, fetch_open_meteo_region, centers)
+    except Exception:
+        degraded = True
+        met = [{"past": [0.0] * 12, "now": 0.0, "next": []} for _ in ids]
+
+    tide = tide_estimate()
+    rows = []
+    for aid, m in zip(ids, met):
+        seg, cap = _area_probe(aid)
+        depth = 0.0
+        for mm in m["past"] + [m["now"]] + list(m.get("next", []))[:4]:
+            depth = step_depth_cm(depth, mm, tide, seg, cap, 0.05)
+        p = 1.0 / (1.0 + _math.exp(-(depth - 12.0) / 6.0))
+        p = max(0.02, min(0.97, p))
+        rows.append({
+            "id": aid, "label": AREAS[aid]["label"], "center": AREAS[aid]["center"],
+            "rain_now": round(m["now"], 2), "past_3h": round(sum(m["past"]), 1),
+            "risk_pct": round(p * 100),
+            "tier": "HIGH" if p >= 0.6 else "MODERATE" if p >= 0.3 else "LOW",
+        })
+    payload = {"updated": _time.strftime("%H:%M"), "degraded": degraded,
+               "tide_est": tide, "areas": rows}
+    _region_cache.update(ts=now, payload=payload)
     return JSONResponse(payload)
 
 

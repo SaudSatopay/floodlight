@@ -1,0 +1,47 @@
+{
+ "drains": [
+  {
+   "id": "MU-D1",
+   "name": "Check Naka line",
+   "capacity_mm": 24,
+   "lat": 19.161,
+   "lng": 72.9562
+  },
+  {
+   "id": "MU-D2",
+   "name": "Maratha Chowk line",
+   "capacity_mm": 23,
+   "lat": 19.1685,
+   "lng": 72.9557
+  },
+  {
+   "id": "MU-D3",
+   "name": "M.G. Rd collector",
+   "capacity_mm": 22,
+   "lat": 19.1721,
+   "lng": 72.9542
+  },
+  {
+   "id": "MU-D4",
+   "name": "Sonapur sump",
+   "capacity_mm": 20,
+   "lat": 19.17,
+   "lng": 72.954
+  },
+  {
+   "id": "MU-D5",
+   "name": "Devidayal-Goshala lateral",
+   "capacity_mm": 23,
+   "lat": 19.169,
+   "lng": 72.9585
+  }
+ ],
+ "sensor_seg": "sonapur",
+ "blocked": "MU-D4",
+ "center": [
+  19.167,
+  72.9558
+ ],
+ "zoom": 15,
+ "label": "Mulund · LBS-Sonapur (T ward)"
+}

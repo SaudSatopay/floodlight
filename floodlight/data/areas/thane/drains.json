@@ -1,0 +1,47 @@
+{
+ "drains": [
+  {
+   "id": "TH-D1",
+   "name": "Talao Pali outfall",
+   "capacity_mm": 24,
+   "lat": 19.1892,
+   "lng": 72.97
+  },
+  {
+   "id": "TH-D2",
+   "name": "Teen Hath sump",
+   "capacity_mm": 21,
+   "lat": 19.185,
+   "lng": 72.9655
+  },
+  {
+   "id": "TH-D3",
+   "name": "Kopri line",
+   "capacity_mm": 22,
+   "lat": 19.1835,
+   "lng": 72.9782
+  },
+  {
+   "id": "TH-D4",
+   "name": "Ram Maruti line",
+   "capacity_mm": 24,
+   "lat": 19.187,
+   "lng": 72.972
+  },
+  {
+   "id": "TH-D5",
+   "name": "Castle Mill culvert",
+   "capacity_mm": 23,
+   "lat": 19.1885,
+   "lng": 72.9635
+  }
+ ],
+ "sensor_seg": "teen-hath",
+ "blocked": "TH-D2",
+ "center": [
+  19.1865,
+  72.97
+ ],
+ "zoom": 15,
+ "label": "Thane · Stn-Teen Hath Naka (TMC)"
+}
