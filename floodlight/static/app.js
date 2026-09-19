@@ -33,25 +33,26 @@ L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
   maxZoom: 19,
 }).addTo(map);
 
-/* Neon-glow street rendering: every segment is TWO strokes — a wide,
-   faint under-glow and a bright core (with a CSS drop-shadow bloom).
-   Dry streets stay quiet indigo veins; live states light up like signal. */
+/* Cased cartographic strokes — professional GIS rendering, not neon:
+   a dark casing under a solid colour fill. Colour is semantics only. */
 const SEG_STYLES = {
-  ok:      { under: ["#26305e", 0.16, 9],  core: ["#5a68a8", 0.70, 3.5], cls: "seg-ok" },
-  watch:   { under: ["#ffb020", 0.18, 12], core: ["#ffc86a", 0.95, 5.0], cls: "seg-watch" },
-  alert:   { under: ["#ff3860", 0.22, 14], core: ["#ff8095", 0.97, 5.5], cls: "seg-alert" },
-  blocked: { under: ["#ffb020", 0.20, 13], core: ["#ffd48a", 0.95, 5.0], cls: "seg-blocked", dash: "0.1 11" },
+  ok:      { core: ["#3e4a52", 0.9, 3.0], cls: "seg-ok" },
+  watch:   { core: ["#e0a83c", 1.0, 4.5], cls: "seg-watch" },
+  alert:   { core: ["#e4574c", 1.0, 5.0], cls: "seg-alert" },
+  blocked: { core: ["#e0a83c", 1.0, 4.5], cls: "seg-blocked", dash: "7 6" },
 };
+const CASING = { color: "#04060a", opacity: 0.85 };
 
 function applySegStyle(id, row) {
   const pair = state.layers[id];
   if (!pair) return;
   const st = SEG_STYLES[row ? row.state : "ok"];
   const depth = row ? Math.max(row.expected_cm, row.observed_cm || 0) : 0;
-  const swell = Math.min(2.2, depth / 16);          // streets swell as water rises
-  pair.under.setStyle({ color: st.under[0], opacity: st.under[1], weight: st.under[2] + swell * 2 });
+  const swell = Math.min(1.6, depth / 22);          // streets thicken as water rises
+  const w = st.core[2] + swell;
+  pair.under.setStyle({ color: CASING.color, opacity: CASING.opacity, weight: w + 3.5 });
   pair.core.setStyle({
-    color: st.core[0], opacity: st.core[1], weight: st.core[2] + swell,
+    color: st.core[0], opacity: st.core[1], weight: w,
     dashArray: st.dash || null,
   });
   const el = pair.core.getElement();
@@ -86,11 +87,11 @@ async function initMeta() {
     const id = f.properties.id;
     const latlngs = f.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
     const under = L.polyline(latlngs, {
-      pane: "glow", color: "#26305e", opacity: 0.16, weight: 9,
+      pane: "glow", color: "#04060a", opacity: 0.85, weight: 6.5,
       lineCap: "round", lineJoin: "round", interactive: false,
     }).addTo(map);
     const core = L.polyline(latlngs, {
-      color: "#5a68a8", opacity: 0.7, weight: 3.5,
+      color: "#3e4a52", opacity: 0.9, weight: 3,
       lineCap: "round", lineJoin: "round", className: "segcore seg-ok",
     }).addTo(map);
     state.layers[id] = { under, core };
@@ -103,13 +104,13 @@ async function initMeta() {
 
   for (const d of meta.drains) {
     state.drainMarkers[d.id] = L.circleMarker([d.lat, d.lng], {
-      radius: 4.5, color: "#6d79c4", fillColor: "#0c0f22", fillOpacity: 1, weight: 1.5,
+      radius: 3.5, color: "#5c666b", fillColor: "#0b0d0f", fillOpacity: 1, weight: 1.5,
     }).addTo(map).bindTooltip(`${d.id} · ${d.name}`, { direction: "top" });
   }
 
-  // The optional ₹2k ultrasonic node at Hindmata Junction — soft cyan pulse.
+  // The optional ₹2k ultrasonic node at Hindmata Junction — slow radar pulse.
   L.circleMarker([19.0154, 72.84465], {
-    radius: 5.5, color: COLORS.cyan, fillColor: COLORS.cyan, fillOpacity: 0.85, weight: 2,
+    radius: 4.5, color: "#4fc1d4", fillColor: "#4fc1d4", fillOpacity: 0.8, weight: 1.5,
     className: "sensor-dot",
   }).addTo(map).bindTooltip("ultrasonic level sensor · Hindmata Jn", { direction: "top" });
 
@@ -136,27 +137,33 @@ function renderMap() {
     if (!m) continue;
     const hot = d.dispatched || d.health < 60;
     m.setStyle({
-      color: hot ? COLORS.watch : "#6d79c4",
-      fillColor: hot ? "#2a1c08" : "#0c0f22",
+      color: hot ? "#e0a83c" : "#5c666b",
+      fillColor: hot ? "#1c1508" : "#0b0d0f",
       weight: hot ? 2 : 1.5,
-      radius: hot ? 6 : 4.5,
+      radius: hot ? 5 : 3.5,
     });
-    const el = m.getElement();
-    if (el) el.setAttribute("class", `leaflet-interactive ${hot ? "drain-hot" : ""}`);
   }
 }
 
 function renderTop() {
   const s = state.snap;
+  if (s.running !== undefined && s.running !== state.running) {
+    state.running = s.running;
+    document.getElementById("btn-play").textContent = s.running ? "❚❚ Pause" : "▶ Run storm";
+  }
   document.getElementById("clock").textContent = s.clock;
   document.getElementById("clock-sub").textContent = s.finished
-    ? "storm replay · complete"
-    : state.running ? `storm replay · minute ${s.minute}` : "storm replay · paused";
-  document.getElementById("rain-now").innerHTML = `${s.rain_now} <small>mm</small>`;
-  document.getElementById("tide-now").innerHTML = `${s.tide_now.toFixed(1)} <small>m</small>`;
+    ? "replay complete"
+    : state.running ? `replay · minute ${s.minute}` : "replay paused";
+  document.getElementById("rain-now").textContent = s.rain_now;
+  document.getElementById("tide-now").textContent = s.tide_now.toFixed(1);
   document.getElementById("tide-lock-bar").style.width = `${s.tide_lock * 100}%`;
   document.getElementById("tide-lock-label").textContent =
-    s.tide_lock >= 0.85 ? "OUTFALLS SEALED" : s.tide_lock > 0.3 ? "outfalls choking" : "outfalls open";
+    s.tide_lock >= 0.85 ? "OUTFALLS SEALED" : s.tide_lock > 0.3 ? "OUTFALLS CHOKING" : "OUTFALLS OPEN";
+  document.getElementById("sb-window").textContent =
+    `WINDOW ${String(Math.max(0, s.step + 1)).padStart(2, "0")}/12 · MIN ${s.minute}`;
+  document.getElementById("sb-live").textContent =
+    s.finished ? "COMPLETE" : state.running ? "RUNNING" : "STANDBY";
 
   document.getElementById("k-alerts").textContent = s.kpis.alerts_sent;
   document.getElementById("k-people").textContent = s.kpis.people_warned.toLocaleString("en-IN");
@@ -204,18 +211,18 @@ function renderChart() {
   s.rain_full.forEach((mm, i) => {
     const h = Math.max(3, (mm / maxRain) * (H - 66));
     const past = i <= s.step;
-    ctx.fillStyle = past ? (i === s.step ? "#7fe3ff" : "#3fd0ff") : "#1d2347";
-    ctx.fillRect(i * bw + 6, H - 34 - h, bw - 12, h);
-    ctx.fillStyle = past ? "#a6adcc" : "#4a5079";
-    ctx.font = "20px JetBrains Mono, monospace";
+    ctx.fillStyle = past ? (i === s.step ? "#4fc1d4" : "#2e6e7e") : "#161b1e";
+    ctx.fillRect(i * bw + 7, H - 34 - h, bw - 14, h);
+    ctx.fillStyle = past ? "#9aa3a7" : "#3d4549";
+    ctx.font = "500 18px IBM Plex Mono, monospace";
     ctx.textAlign = "center";
     ctx.fillText(String(mm), i * bw + bw / 2, H - 12);
   });
 
   // Tide polyline over the bars (right axis, 1.5–5 m).
-  ctx.strokeStyle = "#ffb020";
-  ctx.lineWidth = 3;
-  ctx.setLineDash([8, 6]);
+  ctx.strokeStyle = "#e0a83c";
+  ctx.lineWidth = 2;
+  ctx.setLineDash([7, 6]);
   ctx.beginPath();
   state.meta.storm.tide_m.forEach((t, i) => {
     const y = H - 40 - ((t - 1.5) / 3.5) * (H - 80);
@@ -245,7 +252,7 @@ function renderFeed() {
         const seg = currentRow(r.segment);
         const photo = r.photo ? `<img src="/static/${r.photo}" alt="citizen photo report" />` : "";
         return feedCard("report",
-          `↳ CITIZEN REPORT · ${r.source.toUpperCase()} · min ${r.minute}`,
+          `CITIZEN REPORT · ${r.source.toUpperCase()} · min ${r.minute}`,
           `<b>${seg ? seg.name : r.segment}</b> · ~${r.depth_cm} cm<br>
            <span class="native">${r.name ? r.name + ": " : ""}${r.text}</span>${photo}`);
       },
@@ -257,15 +264,15 @@ function renderFeed() {
       make: () => {
         if (a.kind === "dispatch") {
           const ev = a.meta && a.meta.drain_id ? a.meta.drain_id : "";
-          return feedCard("dispatch", `🛠 WARD DISPATCH · min ${a.minute}`,
-            `${a.text.en}<br><span class="stamp">CREW DISPATCHED → ${ev}</span>`);
+          return feedCard("dispatch", `WARD DISPATCH · min ${a.minute}`,
+            `${a.text.en}<br><span class="tag dispatched">[ CREW DISPATCHED → ${ev} ]</span>`);
         }
         const t = a.text[state.lang] || a.text.en || a.text.mr;
         const head = a.kind === "street"
-          ? `⚠ STREET ALERT · ${a.subscribers} SUBSCRIBERS · ${a.meta.channel} · min ${a.minute}`
+          ? `STREET ALERT · ${a.subscribers} SUBSCRIBERS · ${a.meta.channel} · min ${a.minute}`
           : `WATCH · min ${a.minute}`;
         const lead = a.kind === "street" && a.lead_min > 0
-          ? `<span class="stamp" style="color:#3fd0ff;border-color:#3fd0ff">T−${a.lead_min} MIN HEAD START</span>` : "";
+          ? `<span class="tag lead">[ T−${a.lead_min} MIN HEAD START ]</span>` : "";
         return feedCard(a.kind, head, `${t}${lead ? "<br>" + lead : ""}`);
       },
     });
@@ -309,7 +316,7 @@ async function control(body) {
   })).json();
   state.running = res.running;
   const btn = document.getElementById("btn-play");
-  btn.textContent = state.running ? "⏸ PAUSE" : "▶ RUN STORM";
+  btn.textContent = state.running ? "❚❚ Pause" : "▶ Run storm";
 }
 
 document.getElementById("btn-play").onclick = () =>

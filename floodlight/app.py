@@ -38,13 +38,17 @@ class Hub:
             if q.qsize() < 50:
                 q.put_nowait(payload)
 
+    def stamped(self, snapshot: dict) -> dict:
+        snapshot["running"] = self.running and not self.replay.finished
+        return snapshot
+
     async def _loop(self) -> None:
         while self.running and not self.replay.finished:
             snapshot = self.replay.tick()
-            await self.broadcast(snapshot)
+            await self.broadcast(self.stamped(snapshot))
             await asyncio.sleep(TICK_SECONDS / self.speed)
         self.running = False
-        await self.broadcast(self.replay.snapshot())
+        await self.broadcast(self.stamped(self.replay.snapshot()))
 
     def start(self) -> None:
         if not self.running and not self.replay.finished:
@@ -74,7 +78,9 @@ app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 @app.get("/")
 async def index() -> FileResponse:
-    return FileResponse(STATIC / "index.html")
+    # The shell must never be cached against a newer app.js/style.css.
+    return FileResponse(STATIC / "index.html",
+                        headers={"Cache-Control": "no-cache, must-revalidate"})
 
 
 @app.get("/api/meta")
@@ -94,7 +100,7 @@ async def meta() -> JSONResponse:
 
 @app.get("/api/state")
 async def state() -> JSONResponse:
-    return JSONResponse(hub.replay.snapshot())
+    return JSONResponse(hub.stamped(hub.replay.snapshot()))
 
 
 @app.post("/api/control")
@@ -129,7 +135,7 @@ async def report(req: Request) -> JSONResponse:
 async def stream(request: Request) -> StreamingResponse:
     q: asyncio.Queue = asyncio.Queue()
     hub.clients.add(q)
-    q.put_nowait(hub.replay.snapshot())
+    q.put_nowait(hub.stamped(hub.replay.snapshot()))
 
     async def gen():
         try:
