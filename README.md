@@ -54,13 +54,23 @@ prediction on its streets. The system learns the ward, storm by storm.
 ```bash
 pip install -r requirements.txt
 python run.py
-# open http://localhost:8737 and press ▶ RUN STORM
+# open http://localhost:8737 and press ▶ Run storm
 ```
 
-That replays a 205 mm / 3 h cloudburst (the *08 July 2026* reconstruction) against the **Hindmata–Parel pilot
-belt** — 12 street segments, 9 drains, a scripted stream of citizen WhatsApp reports, and a virtual ultrasonic
-sensor at Hindmata Junction. Everything downstream of the inputs — hydrology, classification, alerting,
-dispatch — is the production code path; swap the replay file for the live MCGM feed and nothing else changes.
+Two scenarios ship in the **Scenario** picker:
+
+- **08 July cloudburst · 205 mm/3 h** — the loud day: early warnings, tide-lock physics, the works.
+- **Quiet Tuesday · 75 mm/3 h** — the day that matters just as much: **zero street alerts** are sent
+  (no false alarms on an ordinary rainy day), and the blocked drain at Parel Tank Rd *still* gets caught
+  and dispatched. The negative case is demonstrated, not claimed.
+
+Both run against the **Hindmata–Parel pilot belt** — 12 road-snapped street segments, 9 drains, scripted
+citizen WhatsApp traffic, and a level sensor at Hindmata Junction. Everything downstream of the inputs —
+hydrology, classification, alerting, dispatch — is the production code path.
+
+The dashboard is deliberately calm: a plain-language status line, four numbers, and a map. Everything else
+is tap-to-reveal — tap a street for its diagnosis card, open the Live feed tab for the raw log (citizen
+photos carry their **CV depth-band tags**), Rainfall for the gauge chart, Map key when you need it.
 
 **What to watch for during the replay**
 
@@ -95,9 +105,27 @@ Run the tests:
 python -m pytest tests/ -q
 ```
 
-Eleven tests pin the three claims the pitch makes: tide lock amplifies flooding, two surprising reports diagnose
-and dispatch a blocked drain exactly once, and a full storm replay produces early trilingual alerts with real
-lead time.
+Eighteen tests pin what the pitch claims: tide lock amplifies flooding · two surprising reports diagnose and
+dispatch a blocked drain exactly once · a full replay produces early trilingual alerts with real lead time ·
+the quiet-day replay sends **zero** street alerts while still catching D-07 · WhatsApp payloads parse into
+reports (depth from "15cm" or "घुटनों तक") · a hardware sensor reading overrides the script · CV depth
+estimation discriminates between bands on real photos.
+
+## Beyond the replay — already wired
+
+| Capability | Where | Turn it on |
+|---|---|---|
+| **Live city feed** | [`engine/livefeed.py`](floodlight/engine/livefeed.py) | `FLOODLIGHT_MODE=live MCGM_RAIN_URL=… python run.py` — same interface as the replay file, degrades to zero-rain + a DEGRADED flag if the feed drops |
+| **WhatsApp Cloud API** | [`engine/whatsapp.py`](floodlight/engine/whatsapp.py) + `/webhook/whatsapp` | Point Meta's webhook here with `WHATSAPP_VERIFY_TOKEN`; set `WHATSAPP_TOKEN` + `WHATSAPP_PHONE_ID` and outbound alerts go real — without them, the sim outbox logs every byte that would send (`/api/outbox`) |
+| **CV depth from photos** | [`engine/cv_depth.py`](floodlight/engine/cv_depth.py) | Always on — every photo report gets a waterline/band estimate with confidence; reporter's own estimate stays the fallback |
+| **Hardware level node** | [`hardware/floodlight_node.ino`](hardware/floodlight_node.ino) + `POST /api/sensor` | Flash the ₹2k ESP32 + ultrasonic build, or fake it: `python tools/sensor_sim.py` — the dashboard flips to LIVE HARDWARE on the first reading |
+
+## Deploy (give judges a URL)
+
+The app is a single uvicorn process with no database — free tiers eat it happily.
+[`render.yaml`](render.yaml) and a `Procfile` are included: connect this repo on
+[Render](https://render.com) (or Railway/Fly), and the start command is
+`uvicorn floodlight.app:app --host 0.0.0.0 --port $PORT`.
 
 ## Honest data notes
 
@@ -110,12 +138,10 @@ lead time.
   “Bombay flooded street” 2005 (Wikimedia Commons, CC BY 2.0), Rakesh Krishna Kumar (CC BY-SA 2.0),
   PlaneMad (CC BY-SA 3.0). Map tiles © OpenStreetMap contributors.
 
-## Roadmap (Grand Finale · 27 Sep)
+## Grand Finale (27 Sep)
 
-- Live MCGM AWS poller behind the same replay interface
-- WhatsApp Cloud API webhook for real report ingestion + subscriber alerts
-- OpenCV water-depth estimation from report photos (reference-object heuristic)
-- The ₹2,000 ESP32 + ultrasonic sensor node, reporting from the venue stage
+The roadmap items landed early (table above). What remains for the stage is connection and theatre:
+venue Wi-Fi, the live sensor bucket-dunk, and alert thresholds tuned on a Hindmata field walk.
 
 ## Team ALL STARS
 

@@ -41,7 +41,7 @@
         <button data-speed="2" class="spd">2×</button>
         <button data-speed="4" class="spd">4×</button>
       </div>
-      <div class="lang">
+      <div class="lang" title="Alert language">
         <button data-lang="mr" class="lng active">मर</button>
         <button data-lang="hi" class="lng">हि</button>
         <button data-lang="en" class="lng">EN</button>
@@ -49,73 +49,118 @@
     </div>
   </header>
 
+  <div id="hintbar">
+    <span id="hint-text">Press ▶ Run storm to replay a real Mumbai cloudburst.</span>
+    <button id="hint-x" title="Hide hints">✕</button>
+  </div>
+
   <main id="layout">
     <section id="map-wrap">
       <div id="map"></div>
-      <div id="legend" class="panel">
+
+      <button id="legend-toggle" class="overlay-pill">Map key</button>
+      <div id="legend" class="panel" hidden>
         <span><i class="sw ok"></i> dry / normal</span>
-        <span><i class="sw watch"></i> watch ≥ 8 cm</span>
-        <span><i class="sw alert"></i> alert ≥ 15 cm</span>
+        <span><i class="sw watch"></i> watch — water rising (≥ 8 cm)</span>
+        <span><i class="sw alert"></i> alert — flooding (≥ 15 cm), people warned</span>
         <span><i class="sw blocked"></i> blocked drain — crew dispatched</span>
-        <span><i class="sw sensor"></i> level sensor</span>
+        <span><i class="sw sensor"></i> water-level sensor</span>
       </div>
-      <div id="engine-card" class="panel">
-        <div class="panel-title">Twin-cause engine</div>
+
+      <div id="map-hint" class="overlay-pill soft">Tap any street to see its diagnosis</div>
+
+      <div id="engine-card" class="panel" hidden>
+        <button id="engine-x" title="Close">✕</button>
+        <div class="panel-title">Street diagnosis</div>
         <div id="engine-seg-name">—</div>
         <div class="ec-bars">
           <div class="ec-row">
-            <span class="ec-label">expected</span>
+            <span class="ec-label" title="What the rain model says this street should have">expected</span>
             <div class="ec-track"><div id="bar-expected" class="ec-fill cyan"></div></div>
             <span class="ec-val" id="val-expected">0.0 cm</span>
           </div>
           <div class="ec-row">
-            <span class="ec-label">observed</span>
+            <span class="ec-label" title="What people and sensors actually see">observed</span>
             <div class="ec-track"><div id="bar-observed" class="ec-fill purple"></div></div>
             <span class="ec-val" id="val-observed">— cm</span>
           </div>
         </div>
         <div class="ec-verdict">
-          <span>Δ <b id="delta-val">0.0</b> cm</span>
+          <span>gap <b id="delta-val">0.0</b> cm</span>
           <span id="verdict-badge" class="badge">no significant water</span>
         </div>
+        <div id="engine-plain" class="ec-plain">Water matches the rain — nothing suspicious underground.</div>
       </div>
     </section>
 
     <section id="rail">
-      <div id="kpis">
-        <div class="kpi"><div class="k-num" id="k-alerts">0</div><div class="k-label">street alerts</div></div>
-        <div class="kpi"><div class="k-num" id="k-people">0</div><div class="k-label">people warned</div></div>
-        <div class="kpi"><div class="k-num" id="k-lead">0<small> min</small></div><div class="k-label">avg lead time</div></div>
-        <div class="kpi"><div class="k-num red" id="k-drains">0</div><div class="k-label">drains flagged</div></div>
-      </div>
+      <nav id="tabs">
+        <button class="tab active" data-tab="status">Status</button>
+        <button class="tab" data-tab="feed">Live feed <em id="feed-badge" hidden>0</em></button>
+        <button class="tab" data-tab="rain">Rainfall</button>
+      </nav>
 
-      <div id="chart-panel">
-        <div class="panel-title">Rainfall · MCGM AWS replay <span class="dim">tide overlaid</span></div>
-        <canvas id="rain-chart" width="640" height="116"></canvas>
-      </div>
-
-      <div id="feed-panel">
-        <div class="panel-title">Live feed <span class="dim">reports · alerts · dispatches</span></div>
-        <div id="feed"></div>
-      </div>
-
-      <div id="composer">
-        <div class="panel-title">File a citizen report <span class="dim">what the WhatsApp bot ingests</span></div>
-        <div class="composer-row">
-          <select id="rep-seg"></select>
-          <input id="rep-depth" type="range" min="2" max="40" value="12" />
-          <span id="rep-depth-val">12 cm</span>
-          <button id="rep-send" class="ctl primary">Send</button>
+      <div class="pane active" id="pane-status">
+        <div id="summary">
+          <div id="summary-line">Ward is quiet.</div>
+          <div id="summary-sub">Pick a scenario and press ▶ Run storm — everything on screen updates every 15 storm-minutes.</div>
         </div>
+
+        <div id="kpis">
+          <div class="kpi"><div class="k-num" id="k-alerts">0</div><div class="k-label">streets warned early</div></div>
+          <div class="kpi"><div class="k-num" id="k-people">0</div><div class="k-label">people alerted</div></div>
+          <div class="kpi"><div class="k-num" id="k-lead">0<small> min</small></div><div class="k-label">avg head start</div></div>
+          <div class="kpi"><div class="k-num red" id="k-drains">0</div><div class="k-label">drains flagged</div></div>
+        </div>
+
+        <button id="worst-row" hidden>
+          <span class="w-label">MOST AT RISK</span>
+          <span class="w-name" id="worst-name">—</span>
+          <span class="w-go">view →</span>
+        </button>
+
+        <div id="scenario">
+          <div class="panel-title">Scenario</div>
+          <select id="storm-sel"></select>
+          <p id="scenario-note">The cloudburst proves early warnings. The quiet day proves silence — no false alarms, and the blocked drain still gets caught.</p>
+        </div>
+
+        <div id="node-strip">
+          <span class="panel-title" style="margin:0">Hardware node</span>
+          <span id="node-badge" class="nodechip sim">SIMULATED</span>
+        </div>
+      </div>
+
+      <div class="pane" id="pane-feed">
+        <div id="feed"></div>
+        <div id="composer">
+          <button id="composer-toggle" class="ctl wide">＋ File a citizen report</button>
+          <div id="composer-body" hidden>
+            <div class="composer-row">
+              <select id="rep-seg"></select>
+              <input id="rep-depth" type="range" min="2" max="40" value="12" />
+              <span id="rep-depth-val">12 cm</span>
+              <button id="rep-send" class="ctl primary">Send</button>
+            </div>
+            <p class="composer-note">Goes through the exact pipeline a WhatsApp report does — watch the engine react on the next window.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane" id="pane-rain">
+        <div class="panel-title" style="padding:0 16px">Rainfall · MCGM AWS replay</div>
+        <canvas id="rain-chart" width="640" height="116"></canvas>
+        <p class="rain-note">Bars — rain per 15 minutes. Dashed line — the tide: when it rises past ~3 m the outfalls seal and the same rain floods much worse. That's Mumbai's multiplier.</p>
       </div>
     </section>
   </main>
 
   <footer id="statusbar">
-    <span class="live" id="sb-live">LIVE</span>
+    <span class="live" id="sb-live">STANDBY</span>
     <span id="storm-name">—</span>
     <span id="sb-window">WINDOW 00/12</span>
-    <span class="right">FLOODLIGHT v0.2 · CX0404 · TEAM ALL STARS</span>
+    <span id="sb-outbox">WA OUTBOX · SIM · 0</span>
+    <span class="right">FLOODLIGHT v0.3 · CX0404 · TEAM ALL STARS</span>
   </footer>
 
   <script src="/static/vendor/leaflet/leaflet.js"></script>

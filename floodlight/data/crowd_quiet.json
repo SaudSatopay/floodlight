@@ -1,0 +1,14 @@
+{
+  "note": "Crowd traffic for the quiet-day replay: almost nothing — except Parel Tank Rd, whose drain is still blocked. Moderate rain, water where the model says there should be none: cause B, caught without a single street alert being wasted elsewhere.",
+  "sensor": {
+    "segment": "amb-02",
+    "note": "Hindmata node on a normal day — puddles at worst.",
+    "depth_cm": [0, 0, 0, 1, 2, 3, 3, 2, 1, 1, 0, 0]
+  },
+  "reports": [
+    { "minute": 22,  "segment": "parel-tank-rd", "depth_cm": 7,  "name": "Sunil · tyre shop",  "text": "पुन्हा पाणी साचतंय — पाऊस तर साधाच आहे", "photo": "reports/r-crossing.jpg", "source": "whatsapp" },
+    { "minute": 37,  "segment": "parel-tank-rd", "depth_cm": 13, "name": "Farida · kirana",    "text": "नाली फिर जाम है, हल्की बारिश में भी पानी",  "photo": "reports/r-shops.jpg",    "source": "whatsapp" },
+    { "minute": 95,  "segment": "parel-tank-rd", "depth_cm": 11, "name": "Sunil · tyre shop",  "text": "अजूनही आहे थोडं",                        "photo": null,                      "source": "whatsapp" },
+    { "minute": 130, "segment": "hindmata-mkt",  "depth_cm": 2,  "name": "Ramesh · merchant",  "text": "इथे सगळं कोरडं, काळजी नाही",              "photo": null,                      "source": "whatsapp" }
+  ]
+}
