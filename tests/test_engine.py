@@ -226,6 +226,15 @@ class TestRiskAt:
         # and the open sea is still out of coverage
         assert live_risk_at(18.95, 72.70, ctx)["covered"] is False
 
+    def test_probability_calibration_rests_low_and_pins_the_alert_line(self):
+        # regression: the old curve idled at 11.9% for ZERO depth — every
+        # dry tap in the city answered the same "12%"
+        from floodlight.engine.hydrology import waterlog_probability
+        assert waterlog_probability(0.0) <= 0.06           # dry ≈ 5%, not 12%
+        assert 0.15 <= waterlog_probability(8.0) <= 0.25   # watch line ≈ 20%
+        assert abs(waterlog_probability(15.0) - 0.5) < 0.01  # alert line = 50%
+        assert waterlog_probability(30.0) >= 0.9
+
     def test_area_estimate_scores_uninstrumented_land(self):
         # tap-anywhere on land must ALWAYS answer — graded honestly
         from floodlight.engine.replay import estimate_risk_at, nearest_street_all_areas
@@ -233,12 +242,17 @@ class TestRiskAt:
         dry = estimate_risk_at(19.117, 72.936,
                                {"past": [0.0] * 13, "next": [0.0] * 4, "tide": 2.0}, near)
         assert dry["covered"] is True and dry["grade"] == "estimate"
-        assert dry["tier"] == "LOW"
-        storm = estimate_risk_at(19.117, 72.936,
-                                 {"past": [22.0] * 13, "next": [30.0] * 4, "tide": 4.4}, near)
+        assert dry["tier"] == "LOW" and dry["probability"] <= 0.06
+        storm_ctx = {"past": [22.0] * 13, "next": [30.0] * 4, "tide": 4.4}
+        storm = estimate_risk_at(19.117, 72.936, storm_ctx, near, elevation_m=5.0)
         assert storm["probability"] > dry["probability"]
         assert storm["tier"] in ("MODERATE", "HIGH")
         assert storm["nearest"]["distance_m"] == near["distance_m"]
+        # low ground must outscore a ridge under the same storm
+        low = estimate_risk_at(19.117, 72.936, storm_ctx, near, elevation_m=2.0)
+        ridge = estimate_risk_at(19.117, 72.936, storm_ctx, near, elevation_m=35.0)
+        assert low["probability"] > ridge["probability"]
+        assert low["bowl"] > ridge["bowl"]
 
 
 class TestSkyOutlook:

@@ -24,7 +24,8 @@ from pathlib import Path
 
 from .alerts import Alert, dispatch_card, street_alert, watch_alert
 from .crowd_gen import generate as generate_crowd
-from .hydrology import Segment, project_crossing, step_depth_cm, tide_lock
+from .hydrology import (Segment, project_crossing, step_depth_cm, tide_lock,
+                        waterlog_probability)
 from .twin_cause import DrainState, classify
 
 DATA = Path(__file__).resolve().parent.parent / "data"
@@ -136,11 +137,9 @@ def live_risk_at(lat: float, lng: float, rain_ctx: dict) -> dict:
     for mm in nxt:
         proj = step_depth_cm(proj, mm, tide, seg, cap, belief)
         peak = max(peak, proj)
-    p = 1.0 / (1.0 + math.exp(-(peak - 12.0) / 6.0))
-    p *= 1.0 + 0.35 * belief
     dist_m = near["distance_m"]
     proximity = 1.0 if dist_m <= 120 else max(0.35, 1.0 - (dist_m - 120) / 600.0)
-    p = max(0.02, min(0.97, p * proximity))
+    p = waterlog_probability(peak, belief, proximity)
     return {
         "covered": True, "grade": "corridor",
         "probability": round(p, 2),
@@ -156,13 +155,17 @@ def live_risk_at(lat: float, lng: float, rain_ctx: dict) -> dict:
     }
 
 
-def estimate_risk_at(lat: float, lng: float, rain_ctx: dict, near: dict) -> dict:
+def estimate_risk_at(lat: float, lng: float, rain_ctx: dict, near: dict,
+                     elevation_m: float | None = None) -> dict:
     """Tap-anywhere fallback for un-instrumented LAND: the same hydrology,
     fed the real rain AT the tapped point and a typical Mumbai street
     profile. Honestly graded 'estimate' — it never impersonates street
-    data, and the popup names the nearest instrumented corridor."""
-    import math
-    seg = Segment(id="__est__", name="area estimate", bowl=1.0,
+    data, and the popup names the nearest instrumented corridor.
+
+    Terrain elevation shapes the low-lying factor, so a 3 m creek-side
+    lane and a 30 m ridge answer differently once rain arrives."""
+    seg_bowl = 1.0 if elevation_m is None else max(0.85, min(1.25, 1.25 - elevation_m / 40.0))
+    seg = Segment(id="__est__", name="area estimate", bowl=seg_bowl,
                   drain_id="", subscribers=0)
     cap, belief = 22.0, 0.05
     past = list(rain_ctx.get("past", []))
@@ -175,8 +178,7 @@ def estimate_risk_at(lat: float, lng: float, rain_ctx: dict, near: dict) -> dict
     for mm in nxt:
         proj = step_depth_cm(proj, mm, tide, seg, cap, belief)
         peak = max(peak, proj)
-    p = 1.0 / (1.0 + math.exp(-(peak - 12.0) / 6.0))
-    p = max(0.02, min(0.97, p))
+    p = waterlog_probability(peak)
     return {
         "covered": True, "grade": "estimate",
         "probability": round(p, 2),
@@ -184,7 +186,8 @@ def estimate_risk_at(lat: float, lng: float, rain_ctx: dict, near: dict) -> dict
         "projected_peak_cm": round(peak, 1),
         "rain_next_hour_mm": round(sum(nxt), 1),
         "tide_lock": round(tide_lock(tide), 2),
-        "bowl": 1.0,
+        "bowl": round(seg_bowl, 2),
+        "elevation_m": None if elevation_m is None else round(elevation_m, 1),
         "nearest": {"segment": near["segment"], "area_label": near["area_label"],
                     "distance_m": near["distance_m"]},
         "anchor": {"lat": lat, "lng": lng},
@@ -387,12 +390,9 @@ class StormReplay:
                 peak = max(peak, proj)
             tide_now = self.storm["tide_m"][t] if t >= 0 else self.storm["tide_m"][0]
 
-        # logistic over projected peak, scaled by drain belief & proximity
-        p = 1.0 / (1.0 + math.exp(-(peak - 12.0) / 6.0))
-        p *= 1.0 + 0.35 * drain.blockage_belief
+        # shared calibration over projected peak, scaled by belief & proximity
         proximity = 1.0 if dist_m <= 120 else max(0.35, 1.0 - (dist_m - 120) / 600.0)
-        p *= proximity
-        p = max(0.02, min(0.97, p))
+        p = waterlog_probability(peak, drain.blockage_belief, proximity)
 
         tier = "HIGH" if p >= 0.6 else "MODERATE" if p >= 0.3 else "LOW"
         return {

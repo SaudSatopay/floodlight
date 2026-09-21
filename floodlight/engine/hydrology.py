@@ -64,6 +64,20 @@ def tide_multiplier(tide_m: float) -> float:
     return 1.0 + tide_lock(tide_m) * (TIDE_MAX_MULTIPLIER - 1.0)
 
 
+def waterlog_probability(peak_cm: float, blockage_belief: float = 0.0,
+                         proximity: float = 1.0) -> float:
+    """The ONE depth→probability calibration behind every tap card and
+    strip. Logistic centred on the 15 cm alert line (≈50%); the 8 cm
+    watch line reads ≈20%; a bone-dry street rests near 5%. (The old
+    (peak−12)/6 curve idled at 11.9% for ZERO depth — every dry tap in
+    the city answered the same '12%', which read as fake.)"""
+    import math
+    p = 1.0 / (1.0 + math.exp(-(peak_cm - 15.0) / 5.0))
+    p *= 1.0 + 0.35 * blockage_belief
+    p *= proximity
+    return max(0.02, min(0.97, p))
+
+
 def window_excess_mm(rain_mm: float, capacity_mm: float, blockage: float) -> float:
     """Rain this window that the drain could not carry.
 

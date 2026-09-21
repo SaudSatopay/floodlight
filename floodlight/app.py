@@ -21,7 +21,7 @@ from fastapi.staticfiles import StaticFiles
 
 import time as _time
 
-from .engine.hydrology import step_depth_cm
+from .engine.hydrology import step_depth_cm, waterlog_probability
 from .engine.hydrology import Segment
 from .engine.livefeed import (LiveMCGMFeed, fetch_open_meteo, fetch_open_meteo_grid,
                               fetch_open_meteo_region, live_mode_enabled, mumbai_grid,
@@ -327,7 +327,6 @@ _region_met: dict = {}          # raw per-corridor rain rows — reused by tap-r
 async def region() -> JSONResponse:
     """MMR coverage strip: every pilot corridor's REAL rain right now and
     the risk it implies on that corridor's worst street."""
-    import math as _math
     now = _time.time()
     if _region_cache["payload"] and now - _region_cache["ts"] < 120:
         return JSONResponse(_region_cache["payload"])
@@ -353,8 +352,7 @@ async def region() -> JSONResponse:
         depth = 0.0
         for mm in m["past"] + [m["now"]] + list(m.get("next", []))[:4]:
             depth = step_depth_cm(depth, mm, tide, seg, cap, 0.05)
-        p = 1.0 / (1.0 + _math.exp(-(depth - 12.0) / 6.0))
-        p = max(0.02, min(0.97, p))
+        p = waterlog_probability(depth)
         # projected risk: keep integrating through the next-6-h FORECAST
         # (each hour split into four 15-min windows) — this is what lets the
         # strip say "34% now → 78% by evening" while the sky is still dry
@@ -362,8 +360,7 @@ async def region() -> JSONResponse:
         for mm_h in m.get("fc_hours", []):
             for _ in range(4):
                 proj = step_depth_cm(proj, mm_h / 4.0, tide, seg, cap, 0.05)
-        p2 = 1.0 / (1.0 + _math.exp(-(proj - 12.0) / 6.0))
-        p2 = max(p, min(0.97, p2))
+        p2 = max(p, waterlog_probability(proj))
         rows.append({
             "id": aid, "label": AREAS[aid]["label"], "center": AREAS[aid]["center"],
             "rain_now": round(m["now"], 2), "past_3h": round(sum(m["past"]), 1),
@@ -416,8 +413,8 @@ async def risk(lat: float, lng: float, mode: str = "replay") -> JSONResponse:
             if pm and pm.get("elevation", 0) > 0.5:
                 ctx3 = {"past": pm["past"] + [pm["now"]], "next": pm["next"],
                         "tide": rain_ctx["tide"]}
-                result = estimate_risk_at(lat, lng, ctx3, near)
-                result["elevation_m"] = round(pm["elevation"], 1)
+                result = estimate_risk_at(lat, lng, ctx3, near,
+                                          elevation_m=pm["elevation"])
             else:
                 result = {"covered": False, "water": pm is not None, **near}
     result["mode"] = mode
