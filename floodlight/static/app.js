@@ -539,6 +539,10 @@ function updateHeat() {
 const SAT_WMS = "https://view.eumetsat.int/geoserver/wms";
 const SAT_LAYER = "msg_iodc:ir108";
 
+// region zoom: clouds present; street zoom: streets win, clouds whisper
+const satOpacity = () => (map.getZoom() >= 13 ? 0.3 : 0.45);
+function satZoomOpacity() { if (state.satLayer) state.satLayer.setOpacity(satOpacity()); }
+
 function refreshSatClouds() {
   // bump the cache-buster every 10 min so the browser pulls fresh frames
   const bucket = Math.floor(Date.now() / 600000);
@@ -561,11 +565,12 @@ function updateClouds() {
       state.satBucket = Math.floor(Date.now() / 600000);
       state.satLayer = L.tileLayer.wms(SAT_WMS, {
         layers: SAT_LAYER, format: "image/png", transparent: true,
-        version: "1.1.1", opacity: 0.5, className: "sat-clouds",
+        version: "1.1.1", opacity: satOpacity(), className: "sat-clouds",
         keepBuffer: 4, updateWhenZooming: false, maxNativeZoom: 11,
         attribution: 'clouds © <a href="https://view.eumetsat.int">EUMETSAT</a> Meteosat IR',
         t: state.satBucket,
       }).addTo(map);
+      map.on("zoomend", satZoomOpacity);
       state.satErr = 0;
       state.satLayer.on("tileerror", () => {
         // a run of failures = feed down → fall back to the data veil
@@ -578,6 +583,7 @@ function updateClouds() {
     }
     $("cloud-toggle").title = "real clouds · Meteosat-9 infrared (10.8 µm) · EUMETSAT · ~15-min frames";
   } else if (state.satLayer) {
+    map.off("zoomend", satZoomOpacity);
     map.removeLayer(state.satLayer);
     state.satLayer = null;
   }
