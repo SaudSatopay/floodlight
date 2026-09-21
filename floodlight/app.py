@@ -25,6 +25,7 @@ from .engine.hydrology import step_depth_cm
 from .engine.hydrology import Segment
 from .engine.livefeed import (LiveMCGMFeed, fetch_open_meteo, fetch_open_meteo_grid,
                               fetch_open_meteo_region, live_mode_enabled, mumbai_grid,
+                              summarize_outlook, wmo_label,
                               tide_estimate)
 from .engine.replay import AREAS, STORMS, StormReplay
 from .engine.whatsapp import Outbox, guess_depth_cm, parse_messages, verify_token
@@ -238,7 +239,8 @@ async def live_city() -> JSONResponse:
         met = await loop.run_in_executor(None, fetch_open_meteo, lat, lng)
     except Exception:
         degraded = True
-        met = {"past": [0.0] * 12, "now": 0.0, "next": [0.0] * 8, "time": ""}
+        met = {"past": [0.0] * 12, "now": 0.0, "next": [0.0] * 8, "time": "",
+               "cloud_now": 0, "code_now": 0, "hours": []}
 
     tide = tide_estimate()
     # Stateless shading: run the past 3 h through the expected model with
@@ -270,6 +272,14 @@ async def live_city() -> JSONResponse:
         "area_label": area["label"],
         "segments": seg_rows,
         "heat": heat,
+        # the sky right now + the next 12 hours — so a black-cloud afternoon
+        # shows up BEFORE the first drop reaches a rain gauge
+        "sky": {"cloud_now": met.get("cloud_now", 0),
+                "code_now": met.get("code_now", 0),
+                "label": wmo_label(met.get("code_now", 0))},
+        "outlook": {"hours": met.get("hours", []),
+                    "summary": summarize_outlook(met["now"], met.get("cloud_now", 0),
+                                                 met.get("hours", []))},
     }
     _live_cache.update(ts=now, payload=payload)
     return JSONResponse(payload)
@@ -313,7 +323,8 @@ async def region() -> JSONResponse:
         met = await loop.run_in_executor(None, fetch_open_meteo_region, centers)
     except Exception:
         degraded = True
-        met = [{"past": [0.0] * 12, "now": 0.0, "next": []} for _ in ids]
+        met = [{"past": [0.0] * 12, "now": 0.0, "next": [], "next6_mm": 0.0,
+                "fc_hours": []} for _ in ids]
 
     tide = tide_estimate()
     rows = []
@@ -324,11 +335,23 @@ async def region() -> JSONResponse:
             depth = step_depth_cm(depth, mm, tide, seg, cap, 0.05)
         p = 1.0 / (1.0 + _math.exp(-(depth - 12.0) / 6.0))
         p = max(0.02, min(0.97, p))
+        # projected risk: keep integrating through the next-6-h FORECAST
+        # (each hour split into four 15-min windows) — this is what lets the
+        # strip say "34% now → 78% by evening" while the sky is still dry
+        proj = depth
+        for mm_h in m.get("fc_hours", []):
+            for _ in range(4):
+                proj = step_depth_cm(proj, mm_h / 4.0, tide, seg, cap, 0.05)
+        p2 = 1.0 / (1.0 + _math.exp(-(proj - 12.0) / 6.0))
+        p2 = max(p, min(0.97, p2))
         rows.append({
             "id": aid, "label": AREAS[aid]["label"], "center": AREAS[aid]["center"],
             "rain_now": round(m["now"], 2), "past_3h": round(sum(m["past"]), 1),
+            "next6_mm": round(m.get("next6_mm", 0.0), 1),
             "risk_pct": round(p * 100),
+            "risk_next_pct": round(p2 * 100),
             "tier": "HIGH" if p >= 0.6 else "MODERATE" if p >= 0.3 else "LOW",
+            "tier_next": "HIGH" if p2 >= 0.6 else "MODERATE" if p2 >= 0.3 else "LOW",
         })
     payload = {"updated": _time.strftime("%H:%M"), "degraded": degraded,
                "tide_est": tide, "areas": rows}
@@ -353,6 +376,12 @@ async def risk(lat: float, lng: float, mode: str = "replay") -> JSONResponse:
         rain_ctx = {"past": met["past"], "next": met["next"], "tide": met["tide_est"]}
     result = hub.replay.risk_at(lat, lng, rain_ctx)
     result["mode"] = mode
+    if mode == "live":
+        cached = _live_cache["payload"]
+        if cached and cached.get("outlook"):
+            # the popup's physics stay honest (next-hour rain only) — the
+            # forecast rides along as its own clearly-labelled line
+            result["forecast"] = cached["outlook"]["summary"]
     return JSONResponse(result)
 
 

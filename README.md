@@ -102,6 +102,18 @@ real rain rate**, flooding streets run animated flow-lines, tide is an honest la
 mode the heat layer shows waterlogging depth instead). Citizen reports and the hardware node stream in
 through the same channels as the replay.
 
+**The sky, before the first drop.** A dashboard that only shows *current* rain sits dark on the very
+afternoon the clouds are stacking up — so LIVE CITY also reads the sky. A **sky-state strip** names the
+moment in plain words (*OVERCAST · 96% CLOUD*, *THUNDERSTORM EXPECTED ~16:00 · in ~2 h*), with an animated
+condition icon and a pulsing ETA chip when a storm is inbound. Below it, a **12-hour forecast outlook** —
+one tappable cell per hour: cloud cover as the cap, expected rain as the bar (teal → amber → red), chance
+of rain underneath; tap any hour for the exact numbers. The rain heatmap gains a **NEXT 6 H mode** (one
+tap on the heat pill) that paints where the *coming* rain will fall, the MMR strip shows each corridor's
+forecast (**34% now ▲ 78% within 6 h** when risk is climbing), and the tap-anywhere probability card
+carries a labelled forecast line. Cloud cover even reaches the weather FX — an 84%-overcast afternoon
+drifts a soft cloud deck across the map before a single gauge ticks. Every forecast value is labelled as
+a forecast; nothing pretends to be a measurement.
+
 **Tap anywhere → waterlogging probability.** Click any point on the map and FLOODLIGHT returns a
 calculated probability for that exact spot — a calibrated logistic over the projected peak depth of the
 nearest street, scaled by drain-health belief, tide lock and proximity — with every driver shown as a

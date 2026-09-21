@@ -118,6 +118,7 @@ small { font-size: 0.68em; color: var(--sub); font-weight: 400; }
 }
 .overlay-pill:hover { color: var(--paper); }
 #legend-toggle { left: 12px; bottom: 12px; }
+#heat-toggle { left: 104px; bottom: 12px; }
 #map-hint { left: 12px; top: 12px; color: var(--teal); border-color: #14454f; cursor: default; }
 .overlay-pill.soft { text-transform: none; letter-spacing: 0.04em; font-size: 10px; }
 
@@ -361,3 +362,82 @@ small { font-size: 0.68em; color: var(--sub); font-weight: 400; }
 .live-note { margin: 12px 16px 6px; font-size: 10.5px; line-height: 1.6; color: var(--faint); }
 .live-note b { color: var(--sub); }
 #live-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--teal); margin-left: 5px; vertical-align: 2px; animation: livepulse 1.8s ease-in-out infinite; }
+
+/* ------------------------------------------------------- sky + outlook */
+
+#sky-strip {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 18px; border-bottom: 1px solid var(--hair2);
+  background: var(--bg2); transition: background 1.2s;
+}
+.sky-icon { flex: 0 0 auto; display: flex; }
+.sky-icon svg { animation: skyBob 7s ease-in-out infinite; overflow: visible; }
+.sk-c1 { fill: #39434c; stroke: #4a565f; stroke-width: 1; }
+.sk-c2 { fill: #2b343c; stroke: #3a444d; stroke-width: 1; }
+.sk-drop { stroke: var(--teal); stroke-width: 1.6; stroke-linecap: round; animation: skDrop 1.15s linear infinite; }
+.sk-drop.heavy { stroke-width: 2; animation-duration: 0.85s; }
+.sk-bolt { fill: var(--amber); animation: skBolt 2.6s ease-in-out infinite; }
+.sk-sun circle { fill: #d9b45a; }
+.sk-sun line { stroke: #d9b45a; stroke-width: 1.5; stroke-linecap: round; }
+.sk-sun { animation: skSpin 40s linear infinite; transform-origin: 24px 16px; transform-box: view-box; }
+
+.sky-txt { flex: 1; min-width: 0; }
+#sky-head { font-family: var(--mono); font-size: 11px; font-weight: 600; letter-spacing: 0.1em; color: var(--paper); }
+#sky-sub { font-size: 10px; color: var(--sub); margin-top: 3px; line-height: 1.45; }
+#sky-eta {
+  font-family: var(--mono); font-size: 9px; font-weight: 600; letter-spacing: 0.08em;
+  color: var(--amber); border: 1px solid #4d3a12; border-radius: 999px;
+  padding: 4px 9px; white-space: nowrap;
+}
+
+#sky-strip.sky-storm-inbound { border-left: 3px solid var(--amber); animation: skyGlow 2.8s ease-in-out infinite; }
+#sky-strip.sky-storm-inbound #sky-head { color: var(--amber); }
+#sky-strip.sky-storm-inbound #sky-eta { animation: etaPulse 1.6s ease-in-out infinite; }
+#sky-strip.sky-rain-soon { border-left: 3px solid #8a6b28; }
+#sky-strip.sky-rain-soon #sky-head { color: var(--amber); }
+#sky-strip.sky-raining #sky-head, #sky-strip.sky-storm-now #sky-head { color: var(--teal); }
+#sky-strip.sky-storm-now { border-left: 3px solid var(--red); }
+#sky-strip.sky-storm-now #sky-head { color: var(--red); }
+#sky-strip.sky-overcast { border-left: 3px solid #3a444d; }
+#sky-strip.sky-degraded #sky-head { color: var(--faint); }
+
+#outlook { padding: 14px 0 4px; border-bottom: 1px solid var(--hair2); }
+.ol-src { font-family: var(--mono); font-size: 8px; letter-spacing: 0.08em; color: var(--faint); text-transform: lowercase; margin-left: 8px; }
+#outlook-strip { display: grid; grid-template-columns: repeat(12, 1fr); gap: 3px; padding: 8px 16px 0; }
+.oh {
+  appearance: none; background: none; border: 1px solid transparent; border-radius: 5px;
+  display: flex; flex-direction: column; align-items: center; padding: 5px 0 4px;
+  cursor: pointer; font: inherit; color: inherit;
+}
+.oh:hover { border-color: var(--hair2); background: #0f1316; }
+.oh.sel { border-color: #14454f; background: #0c1518; }
+.oh-cloud { width: 68%; height: 5px; border-radius: 3px; background: #45525c; margin-bottom: 4px; }
+.oh-barwrap { height: 48px; width: 100%; display: flex; align-items: flex-end; justify-content: center; }
+.oh-bar { display: block; width: 58%; border-radius: 2px 2px 0 0; transform-origin: bottom; animation: ohPop 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.15) backwards; }
+.oh-prob { font-family: var(--mono); font-size: 8px; color: var(--faint); margin-top: 4px; }
+.oh-hr { font-family: var(--mono); font-size: 8.5px; color: var(--sub); margin-top: 1px; }
+#outlook-detail { font-family: var(--mono); font-size: 9.5px; color: var(--sub); padding: 9px 16px 10px; line-height: 1.5; }
+#outlook-detail b { color: var(--teal); font-weight: 600; }
+
+.rr-fc { color: var(--amber); font-weight: 600; font-style: normal; }
+.rr-next { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 10px; font-weight: 600; margin-right: 6px; animation: etaPulse 2.2s ease-in-out infinite; }
+
+.rp-fc {
+  font-family: var(--mono); font-size: 9px; letter-spacing: 0.04em; color: var(--amber);
+  border-top: 1px dashed var(--hair2); margin-top: 8px; padding-top: 7px; line-height: 1.5;
+}
+
+.sky-chip { font-family: var(--mono); font-size: 9px; letter-spacing: 0.08em; color: var(--sub); white-space: nowrap; }
+.sky-chip.sky-storm-inbound, .sky-chip.sky-rain-soon { color: var(--amber); animation: etaPulse 2.4s ease-in-out infinite; }
+.sky-chip.sky-raining { color: var(--teal); }
+.sky-chip.sky-storm-now { color: var(--red); animation: etaPulse 1.4s ease-in-out infinite; }
+
+.overlay-pill.fc { color: var(--amber); border-color: #4d3a12; }
+
+@keyframes skyBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2.5px); } }
+@keyframes skDrop { 0% { transform: translateY(-4px); opacity: 0; } 25% { opacity: 0.95; } 80% { opacity: 0.6; } 100% { transform: translateY(5px); opacity: 0; } }
+@keyframes skBolt { 0%, 100% { opacity: 0.25; } 46% { opacity: 0.25; } 50% { opacity: 1; } 56% { opacity: 0.45; } 60% { opacity: 0.95; } 70% { opacity: 0.25; } }
+@keyframes skSpin { to { transform: rotate(360deg); } }
+@keyframes skyGlow { 0%, 100% { background: #12100b; } 50% { background: #1a150c; } }
+@keyframes etaPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+@keyframes ohPop { from { transform: scaleY(0); } }

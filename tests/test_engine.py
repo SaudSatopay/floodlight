@@ -198,6 +198,52 @@ class TestRiskAt:
         assert dry["probability"] <= 0.2
 
 
+class TestSkyOutlook:
+    """The forecast verdict: a black-cloud afternoon must SAY so before the
+    first drop lands — and a clear day must not cry storm."""
+
+    @staticmethod
+    def _hours(mms, probs=None, clouds=None, codes=None, t0=14):
+        n = len(mms)
+        return [{"t": f"{(t0 + i) % 24:02d}:00", "mm": mms[i],
+                 "prob": (probs or [0] * n)[i], "cloud": (clouds or [50] * n)[i],
+                 "code": (codes or [3] * n)[i]} for i in range(n)]
+
+    def test_overcast_but_dry_is_named_not_silent(self):
+        from floodlight.engine.livefeed import summarize_outlook
+        s = summarize_outlook(0.0, 96, self._hours([0.0] * 12, clouds=[95] * 12))
+        assert s["level"] == "overcast"
+        assert "96%" in s["headline"]
+
+    def test_heavy_rain_incoming_is_called_with_an_eta(self):
+        from floodlight.engine.livefeed import summarize_outlook
+        mms = [0.0, 0.2, 4.8, 6.1, 2.0] + [0.5] * 7
+        s = summarize_outlook(0.0, 98, self._hours(
+            mms, probs=[20, 40, 85, 90, 70] + [40] * 7, codes=[3, 3, 95, 95, 63] + [61] * 7))
+        assert s["level"] == "storm-inbound"
+        assert s["eta_h"] == 2 and s["eta_txt"] == "in ~2 h"
+        assert "16:00" in s["headline"] and "THUNDERSTORM" in s["headline"]
+        assert s["next6_mm"] == 13.6
+        assert s["prob_max"] == 90
+
+    def test_raining_now_beats_the_forecast_story(self):
+        from floodlight.engine.livefeed import summarize_outlook
+        s = summarize_outlook(6.2, 100, self._hours([8.0] * 12, probs=[95] * 12))
+        assert s["level"] == "storm-now"
+
+    def test_clear_day_stays_clear(self):
+        from floodlight.engine.livefeed import summarize_outlook
+        s = summarize_outlook(0.0, 8, self._hours([0.0] * 12, clouds=[5] * 12, codes=[0] * 12))
+        assert s["level"] == "clear"
+        assert s["next12_mm"] == 0.0
+
+    def test_wmo_codes_speak_ward_officer(self):
+        from floodlight.engine.livefeed import wmo_label
+        assert wmo_label(95) == "thunderstorm"
+        assert wmo_label(3) == "overcast"
+        assert wmo_label(9999) == "rain"                    # unknown → safe default
+
+
 class TestStormReplay:
     def setup_method(self):
         self.replay = StormReplay()

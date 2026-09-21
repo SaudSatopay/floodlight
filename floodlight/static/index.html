@@ -60,7 +60,7 @@
       <canvas id="rain-fx"></canvas>
 
       <button id="legend-toggle" class="overlay-pill">Map key</button>
-      <button id="heat-toggle" class="overlay-pill on" style="left:96px">Heatmap · on</button>
+      <button id="heat-toggle" class="overlay-pill on">Heatmap · on</button>
       <div id="legend" class="panel" hidden>
         <span><i class="sw ok"></i> dry / normal</span>
         <span><i class="sw watch"></i> watch — water rising (≥ 8 cm)</span>
@@ -149,6 +149,15 @@
           <div id="live-under" class="live-under">dry over <span id="live-area">this ward</span> right now</div>
         </div>
 
+        <div id="sky-strip" class="sky-clear">
+          <span id="sky-icon" class="sky-icon" aria-hidden="true"></span>
+          <div class="sky-txt">
+            <div id="sky-head">READING THE SKY…</div>
+            <div id="sky-sub">fetching cloud cover & forecast</div>
+          </div>
+          <span id="sky-eta" hidden>—</span>
+        </div>
+
         <div class="live-grid">
           <div class="live-cell"><div class="lc-num" id="live-3h">0.0</div><div class="lc-label">mm · last 3 h (real)</div></div>
           <div class="live-cell"><div class="lc-num" id="live-next">0.0</div><div class="lc-label">mm · next 2 h (forecast)</div></div>
@@ -158,6 +167,12 @@
         <div id="live-chart-wrap">
           <div class="panel-title">Past 3 h · now · next 2 h</div>
           <canvas id="live-chart" width="640" height="110"></canvas>
+        </div>
+
+        <div id="outlook">
+          <div class="panel-title">Next 12 hours · forecast <span class="ol-src">open-meteo hourly</span></div>
+          <div id="outlook-strip"></div>
+          <div id="outlook-detail">tap an hour for the exact numbers</div>
         </div>
 
         <div id="live-risk">
@@ -173,10 +188,11 @@
         <button id="fx-preview" class="ctl wide" style="margin:10px 16px 0; width:calc(100% - 32px)">☔ Preview downpour FX (visuals only)</button>
 
         <p class="live-note" id="live-note">
-          rainfall — real, <b>open-meteo.com</b> (15-minutely) · tide — approximate semidiurnal estimate ·
-          street shading — the same hydrology model, fed today's actual rain. The preview button above plays
-          the rain/lightning visuals without touching any data. Citizen reports & the hardware node stream
-          in through the same channels as the replay.
+          rainfall & sky — real, <b>open-meteo.com</b> (15-minutely + hourly forecast) · tide — approximate
+          semidiurnal estimate · street shading — the same hydrology model, fed today's actual rain.
+          Forecast bars and "expected ~time" lines are model forecasts, labelled as such. The preview button
+          above plays the rain/lightning visuals without touching any data. Citizen reports & the hardware
+          node stream in through the same channels as the replay.
         </p>
       </div>
 
@@ -209,7 +225,8 @@
     <span id="storm-name">—</span>
     <span id="sb-window">WINDOW 00/12</span>
     <span id="sb-outbox">WA OUTBOX · SIM · 0</span>
-    <span class="right">FLOODLIGHT v0.4 · CX0404 · TEAM ALL STARS</span>
+    <span id="sb-sky" hidden></span>
+    <span class="right">FLOODLIGHT v0.5 · CX0404 · TEAM ALL STARS</span>
   </footer>
 
   <script src="/static/vendor/leaflet/leaflet.js"></script>

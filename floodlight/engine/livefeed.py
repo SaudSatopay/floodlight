@@ -97,32 +97,133 @@ def live_mode_enabled() -> bool:
 # --------------------------------------------------------------------------
 
 def fetch_open_meteo(lat: float, lng: float) -> dict:
-    """Past 3 h + next 2 h of 15-minutely precipitation for a point.
+    """Past 3 h + next 2 h of 15-minutely precipitation for a point, PLUS
+    the sky right now (cloud cover, condition) and a 12-hour hourly outlook
+    (rain, probability, cloud) — all in one keyless call.
 
-    Returns {"past": [12 × mm], "now": mm, "next": [8 × mm], "time": iso}.
-    Raises on network failure — callers decide how to degrade.
+    Returns {"past": [12 × mm], "now": mm, "next": [8 × mm], "time": iso,
+             "cloud_now": %, "code_now": wmo, "hours": [12 × {t, mm, prob,
+             cloud, code}]}. Raises on network failure — callers degrade.
     """
     url = ("https://api.open-meteo.com/v1/forecast"
            f"?latitude={lat:.4f}&longitude={lng:.4f}"
            "&minutely_15=precipitation&past_minutely_15=12&forecast_minutely_15=9"
+           "&current=cloud_cover,weather_code"
+           "&hourly=precipitation,precipitation_probability,cloud_cover,weather_code"
+           "&forecast_hours=12"
            "&timezone=Asia%2FKolkata")
     req = urllib.request.Request(url, headers={"User-Agent": "floodlight/0.3"})
     with urllib.request.urlopen(req, timeout=20) as r:
         data = json.load(r)
     vals = [float(v or 0) for v in data["minutely_15"]["precipitation"]]
     times = data["minutely_15"]["time"]
+    cur = data.get("current", {})
+    hh = data.get("hourly", {})
+    ht = hh.get("time", [])
+    hours = []
+    for i, t in enumerate(ht[:12]):
+        def _pick(key, default=0):
+            arr = hh.get(key, [])
+            return arr[i] if i < len(arr) and arr[i] is not None else default
+        hours.append({
+            "t": t[-5:],                                   # "…T15:00" → "15:00"
+            "mm": round(float(_pick("precipitation")), 2),
+            "prob": int(_pick("precipitation_probability")),
+            "cloud": int(_pick("cloud_cover")),
+            "code": int(_pick("weather_code")),
+        })
     return {"past": vals[:12], "now": vals[12] if len(vals) > 12 else 0.0,
-            "next": vals[13:], "time": times[12] if len(times) > 12 else ""}
+            "next": vals[13:], "time": times[12] if len(times) > 12 else "",
+            "cloud_now": int(cur.get("cloud_cover", 0) or 0),
+            "code_now": int(cur.get("weather_code", 0) or 0),
+            "hours": hours}
+
+
+# WMO weather interpretation codes → the words a ward officer would use.
+WMO_LABELS = {
+    0: "clear sky", 1: "mostly clear", 2: "partly cloudy", 3: "overcast",
+    45: "fog", 48: "fog", 51: "light drizzle", 53: "drizzle", 55: "heavy drizzle",
+    61: "light rain", 63: "rain", 65: "heavy rain",
+    80: "rain showers", 81: "heavy showers", 82: "violent showers",
+    95: "thunderstorm", 96: "thunderstorm + hail", 99: "thunderstorm + hail",
+}
+
+
+def wmo_label(code: int) -> str:
+    return WMO_LABELS.get(int(code), "rain")
+
+
+def summarize_outlook(rain_now: float, cloud_now: int, hours: list[dict]) -> dict:
+    """Classify the next 12 hours into one verdict the dashboard can SHOW.
+
+    Pure function (unit-tested, no network). Levels, in escalating order:
+    clear · cloudy · overcast · rain-soon · storm-inbound · raining · storm-now.
+    """
+    hrs = hours[:12]
+    next6 = round(sum(h["mm"] for h in hrs[:6]), 1)
+    next12 = round(sum(h["mm"] for h in hrs), 1)
+    prob_max = max([h["prob"] for h in hrs], default=0)
+    peak = max(hrs, key=lambda h: h["mm"], default=None)
+
+    # first hour that qualifies as a real storm / as any rain
+    hit = next((h for h in hrs if h["mm"] >= 2.5
+                or (h["prob"] >= 70 and h["mm"] >= 0.8)
+                or (h["code"] >= 95 and h["prob"] >= 50)), None)
+    soon = next((h for h in hrs if h["mm"] >= 0.3 or h["prob"] >= 55), None)
+
+    def eta(h):
+        i = hrs.index(h)
+        return i, ("within the hour" if i == 0 else f"in ~{i} h")
+
+    if rain_now >= 4.0:
+        level, headline = "storm-now", f"HEAVY RAIN NOW · {rain_now:.1f} MM/15 MIN"
+        detail = f"{next6:.1f} mm more expected in the next 6 h · peak {peak['mm']:.1f} mm/h ~{peak['t']}" if peak else ""
+        eta_h, eta_txt = 0, "now"
+    elif rain_now >= 0.2:
+        level, headline = "raining", "RAIN FALLING NOW"
+        detail = f"{next6:.1f} mm more expected in the next 6 h · {prob_max}% chance it continues"
+        eta_h, eta_txt = 0, "now"
+    elif hit:
+        eta_h, eta_txt = eta(hit)
+        level = "storm-inbound"
+        headline = f"{wmo_label(hit['code']).upper()} EXPECTED ~{hit['t']}"
+        detail = (f"{next6:.1f} mm in the next 6 h · up to {peak['mm']:.1f} mm/h ~{peak['t']}"
+                  f" · {prob_max}% chance" if peak else f"{prob_max}% chance")
+    elif soon:
+        eta_h, eta_txt = eta(soon)
+        level = "rain-soon"
+        headline = f"RAIN LIKELY FROM ~{soon['t']}"
+        detail = f"{next12:.1f} mm over the next 12 h · {prob_max}% chance"
+    elif cloud_now >= 70:
+        level, headline = "overcast", f"OVERCAST · {cloud_now}% CLOUD"
+        detail = "no significant rain reaching the ground in the next 12 h"
+        eta_h, eta_txt = -1, ""
+    elif cloud_now >= 35:
+        level, headline = "cloudy", f"PARTLY CLOUDY · {cloud_now}%"
+        detail = "no rain expected in the next 12 h"
+        eta_h, eta_txt = -1, ""
+    else:
+        level, headline = "clear", "CLEAR SKIES"
+        detail = "no rain expected in the next 12 h"
+        eta_h, eta_txt = -1, ""
+
+    return {"level": level, "headline": headline, "detail": detail,
+            "eta_h": eta_h, "eta_txt": eta_txt,
+            "next6_mm": next6, "next12_mm": next12, "prob_max": prob_max,
+            "peak_mm": peak["mm"] if peak else 0.0,
+            "peak_t": peak["t"] if peak else ""}
 
 
 def fetch_open_meteo_grid(points: list[tuple[float, float]]) -> list[dict]:
-    """Current precipitation for MANY points in one call (Open-Meteo accepts
-    comma-separated coordinate lists) — feeds the live rain heatmap."""
+    """Current precipitation AND the next-6-h forecast total for MANY points
+    in one call (Open-Meteo accepts comma-separated coordinate lists) —
+    feeds the live rain heatmap in both its NOW and FORECAST modes."""
     lats = ",".join(f"{p[0]:.3f}" for p in points)
     lngs = ",".join(f"{p[1]:.3f}" for p in points)
     url = ("https://api.open-meteo.com/v1/forecast"
            f"?latitude={lats}&longitude={lngs}"
-           "&current=precipitation&timezone=Asia%2FKolkata")
+           "&current=precipitation&hourly=precipitation&forecast_hours=6"
+           "&timezone=Asia%2FKolkata")
     req = urllib.request.Request(url, headers={"User-Agent": "floodlight/0.4"})
     with urllib.request.urlopen(req, timeout=25) as r:
         data = json.load(r)
@@ -130,7 +231,9 @@ def fetch_open_meteo_grid(points: list[tuple[float, float]]) -> list[dict]:
     out = []
     for p, row in zip(points, rows):
         mm = float(row.get("current", {}).get("precipitation", 0) or 0)
-        out.append({"lat": p[0], "lng": p[1], "mm": mm})
+        fc = [float(v or 0) for v in row.get("hourly", {}).get("precipitation", [])]
+        out.append({"lat": p[0], "lng": p[1], "mm": mm,
+                    "next6": round(sum(fc[:6]), 1)})
     return out
 
 
@@ -155,6 +258,7 @@ def fetch_open_meteo_region(points: list[tuple[float, float]]) -> list[dict]:
     url = ("https://api.open-meteo.com/v1/forecast"
            f"?latitude={lats}&longitude={lngs}"
            "&minutely_15=precipitation&past_minutely_15=12&forecast_minutely_15=5"
+           "&hourly=precipitation&forecast_hours=6"
            "&timezone=Asia%2FKolkata")
     req = urllib.request.Request(url, headers={"User-Agent": "floodlight/0.5"})
     with urllib.request.urlopen(req, timeout=25) as r:
@@ -163,9 +267,11 @@ def fetch_open_meteo_region(points: list[tuple[float, float]]) -> list[dict]:
     out = []
     for p, row in zip(points, rows):
         vals = [float(v or 0) for v in row.get("minutely_15", {}).get("precipitation", [0] * 13)]
+        fc = [float(v or 0) for v in row.get("hourly", {}).get("precipitation", [])]
         out.append({"lat": p[0], "lng": p[1],
                     "past": vals[:12], "now": vals[12] if len(vals) > 12 else 0.0,
-                    "next": vals[13:]})
+                    "next": vals[13:], "next6_mm": round(sum(fc[:6]), 1),
+                    "fc_hours": fc[:6]})
     return out
 
 

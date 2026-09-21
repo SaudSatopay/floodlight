@@ -23,6 +23,8 @@ const state = {
   mapHintDone: false,
   liveTimer: null,
   heatOn: true,
+  heatMode: "now",              // live heat: "now" | "fc" (next 6 h) | "off"
+  outlookSel: -1,               // tapped hour in the 12-h outlook strip
   heatLayer: null,
   riskPin: null,
   region: null,
@@ -227,6 +229,7 @@ const fx = {
   ],
   splashes: [], ripples: [], flash: 0, previewUntil: 0,
   lastRipple: 0, lastSensor: 0,
+  cloud: 0, blobs: [],          // overcast deck (0–100, eased)
 };
 
 function fxIntensity() {
@@ -238,6 +241,46 @@ function fxIntensity() {
     mm = Math.max(mm, left > 16 ? (20 - left) * 11 : left > 5 ? 44 : left * 8);
   }
   return Math.max(0, Math.min(48, mm));
+}
+
+function fxCloudTarget() {
+  // in LIVE mode the deck is the REAL sky; in replay it thickens with rain
+  let c = 0;
+  if (state.mode === "live" && state.live && state.live.sky) c = state.live.sky.cloud_now;
+  else c = Math.min(85, fx.intensity * 2.4);
+  if (Date.now() < fx.previewUntil) c = Math.max(c, 90);
+  return c;
+}
+
+function drawClouds(ctx, W, H) {
+  fx.cloud += (fxCloudTarget() - fx.cloud) * 0.02;
+  if (fx.cloud < 3) return;
+  if (!fx.blobs.length) {
+    for (let i = 0; i < 7; i++) {
+      fx.blobs.push({ x: Math.random(), y: 0.02 + Math.random() * 0.16,
+                      r: 0.16 + Math.random() * 0.2, s: 0.05 + Math.random() * 0.1,
+                      o: 0.55 + Math.random() * 0.45 });
+    }
+  }
+  const k = fx.cloud / 100;
+  // a soft ceiling — the whole frame dims a touch under heavy cloud
+  const dim = ctx.createLinearGradient(0, 0, 0, H * 0.55);
+  dim.addColorStop(0, `rgba(7, 10, 13, ${0.34 * k})`);
+  dim.addColorStop(1, "rgba(7, 10, 13, 0)");
+  ctx.fillStyle = dim;
+  ctx.fillRect(0, 0, W, H * 0.55);
+  // drifting cloud bellies along the top edge
+  for (const b of fx.blobs) {
+    b.x += (b.s * k) / W * 60;
+    if (b.x * W - b.r * W > W) b.x = -b.r;
+    const cx = b.x * W, cy = b.y * H, cr = b.r * W;
+    const g = ctx.createRadialGradient(cx, cy, cr * 0.15, cx, cy, cr);
+    g.addColorStop(0, `rgba(30, 38, 45, ${0.30 * k * b.o})`);
+    g.addColorStop(0.7, `rgba(22, 28, 34, ${0.16 * k * b.o})`);
+    g.addColorStop(1, "rgba(22, 28, 34, 0)");
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(cx, cy, cr, 0, 2 * Math.PI); ctx.fill();
+  }
 }
 
 function spawnRipple(x, y, color, max = 26) {
@@ -267,6 +310,9 @@ function fxLoop() {
   fx.intensity += (target - fx.intensity) * 0.05;
   ctx.clearRect(0, 0, c.width, c.height);
   const now = Date.now();
+
+  // overcast deck first — the sky sits behind the rain
+  drawClouds(ctx, c.width, c.height);
 
   // rain — three parallax layers
   for (const L of fx.layers) {
@@ -461,9 +507,12 @@ function updateHeat() {
 
   const pts = [];
   if (state.mode === "live" && state.live && state.live.heat) {
-    // real rain across Greater Mumbai (Open-Meteo grid, mm/15 min)
+    // real rain across Greater Mumbai (Open-Meteo grid) — NOW shows mm/15min,
+    // FORECAST shows the next-6-h total, so the map lights up BEFORE the storm
     for (const h of state.live.heat) {
-      if (h.mm > 0.05) pts.push([h.lat, h.lng, Math.min(1, h.mm / 6)]);
+      if (state.heatMode === "fc") {
+        if ((h.next6 || 0) > 0.2) pts.push([h.lat, h.lng, Math.min(1, h.next6 / 22)]);
+      } else if (h.mm > 0.05) pts.push([h.lat, h.lng, Math.min(1, h.mm / 6)]);
     }
   } else if (state.snap) {
     // waterlogging heat: depth along every street segment
@@ -497,6 +546,8 @@ function riskPopupHtml(r) {
     ${bar("rain next hour", r.rain_next_hour_mm / 60, r.rain_next_hour_mm + " mm")}
     ${bar("drain risk", (100 - r.drain_health) / 100, r.drain_health + "% health")}
     ${bar("tide lock", r.tide_lock, Math.round(r.tide_lock * 100) + "%")}
+    ${r.forecast && r.mode === "live" && r.forecast.next6_mm >= 0.5
+      ? `<div class="rp-fc">▲ FORECAST · ${r.forecast.next6_mm} mm in the next 6 h — ${r.forecast.headline.toLowerCase()}</div>` : ""}
     <div class="rp-note">${r.mode === "live" ? "computed from today's REAL rain" : "computed from the running storm"} · low-lying factor ×${r.bowl}</div>
   </div>`;
 }
@@ -605,6 +656,104 @@ function renderChart() {
   ctx.setLineDash([]);
 }
 
+/* ------------------------------------------------------ sky + outlook */
+
+const CLOUD_D = "M12 26a7 7 0 0 1 0-14 10 10 0 0 1 19-3 8 8 0 0 1 5 17z";
+const WMO_TXT = (c) => ({ 0: "clear sky", 1: "mostly clear", 2: "partly cloudy", 3: "overcast",
+  45: "fog", 48: "fog", 51: "light drizzle", 53: "drizzle", 55: "heavy drizzle",
+  61: "light rain", 63: "rain", 65: "heavy rain", 80: "rain showers",
+  81: "heavy showers", 82: "violent showers", 95: "thunderstorm",
+  96: "thunderstorm + hail", 99: "thunderstorm + hail" }[c] || "rain");
+
+function skyIconSvg(level) {
+  const cloud = (cls, dx, dy, sc) =>
+    `<path class="${cls}" transform="translate(${dx},${dy}) scale(${sc})" d="${CLOUD_D}"/>`;
+  const drops = (n, heavy) => Array.from({ length: n }, (_, i) =>
+    `<line class="sk-drop${heavy ? " heavy" : ""}" style="animation-delay:${(i * 0.38).toFixed(2)}s" x1="${17 + i * 8}" y1="28" x2="${15 + i * 8}" y2="35"/>`).join("");
+  const bolt = `<path class="sk-bolt" d="M26 22l-6 9h4.4l-3 8 9.4-11h-4.6l4.4-6z"/>`;
+  const sun = `<g class="sk-sun"><circle cx="24" cy="16" r="6"/>${Array.from({ length: 8 }, (_, i) => {
+    const a = (i * Math.PI) / 4;
+    return `<line x1="${(24 + Math.cos(a) * 9).toFixed(1)}" y1="${(16 + Math.sin(a) * 9).toFixed(1)}" x2="${(24 + Math.cos(a) * 12.5).toFixed(1)}" y2="${(16 + Math.sin(a) * 12.5).toFixed(1)}"/>`;
+  }).join("")}</g>`;
+  let body;
+  if (level === "clear") body = sun;
+  else if (level === "cloudy") body = sun + cloud("sk-c1", 12, 6, 0.72);
+  else if (level === "overcast") body = cloud("sk-c2", 17, 4, 0.6) + cloud("sk-c1", 2, 6, 0.85);
+  else if (level === "rain-soon") body = cloud("sk-c1", 4, 3, 0.85) + drops(2);
+  else if (level === "storm-inbound") body = cloud("sk-c2", 17, 2, 0.58) + cloud("sk-c1", 2, 3, 0.85) + bolt;
+  else if (level === "storm-now") body = cloud("sk-c1", 2, 3, 0.9) + drops(3, true) + bolt;
+  else body = cloud("sk-c1", 2, 3, 0.9) + drops(3);          // raining
+  return `<svg viewBox="0 0 48 42" width="46" height="38" aria-hidden="true">${body}</svg>`;
+}
+
+function renderSky() {
+  const l = state.live;
+  const strip = $("sky-strip");
+  if (!l || !strip) return;
+  if (l.degraded || !l.outlook) {
+    strip.className = "sky-degraded";
+    $("sky-head").textContent = "SKY DATA UNAVAILABLE";
+    $("sky-sub").textContent = "forecast feed unreachable — showing rain gauges only";
+    $("sky-icon").innerHTML = skyIconSvg("overcast");
+    $("sky-eta").hidden = true;
+    return;
+  }
+  const s = l.outlook.summary, sky = l.sky || {};
+  strip.className = `sky-${s.level}`;
+  $("sky-icon").innerHTML = skyIconSvg(s.level);
+  $("sky-head").textContent = s.headline;
+  $("sky-sub").textContent = s.detail;
+  const eta = $("sky-eta");
+  if (s.eta_h >= 0 && (s.level === "storm-inbound" || s.level === "rain-soon")) {
+    eta.hidden = false;
+    eta.textContent = s.eta_txt.toUpperCase();
+  } else eta.hidden = true;
+
+  // statusbar chip — the sky verdict follows you to every tab
+  const sb = $("sb-sky");
+  if (state.mode === "live") {
+    sb.hidden = false;
+    sb.className = `sky-chip sky-${s.level}`;
+    sb.textContent = s.next6_mm >= 0.5
+      ? `SKY ${sky.cloud_now ?? 0}% · +${s.next6_mm.toFixed(1)}MM/6H`
+      : `SKY ${sky.cloud_now ?? 0}% · DRY 6H`;
+  }
+}
+
+const OL_COL = (mm) => (mm >= 5 ? "#e4574c" : mm >= 1.5 ? "#e0a83c" : "#4fc1d4");
+
+function renderOutlook() {
+  const l = state.live, strip = $("outlook-strip");
+  if (!l || !strip) return;
+  const hours = (l.outlook && l.outlook.hours) || [];
+  $("outlook").hidden = !hours.length;
+  if (!hours.length) return;
+  const key = JSON.stringify(hours);
+  if (strip.dataset.key === key) return;                     // unchanged — don't re-animate
+  strip.dataset.key = key;
+  state.outlookSel = -1;
+  const mx = Math.max(...hours.map((h) => h.mm), 2);         // floor keeps drizzle small
+  strip.innerHTML = "";
+  hours.forEach((h, i) => {
+    const cell = document.createElement("button");
+    cell.className = "oh";
+    cell.title = `${h.t} · ${h.mm.toFixed(1)} mm · ${h.prob}%`;
+    cell.innerHTML = `
+      <i class="oh-cloud" style="opacity:${((h.cloud / 100) * 0.85).toFixed(2)}"></i>
+      <span class="oh-barwrap"><i class="oh-bar" style="height:${Math.max(2, Math.round((h.mm / mx) * 46))}px;background:${OL_COL(h.mm)};animation-delay:${i * 45}ms"></i></span>
+      <span class="oh-prob">${h.prob >= 25 ? h.prob : "·"}</span>
+      <span class="oh-hr">${h.t.slice(0, 2)}</span>`;
+    cell.onclick = () => {
+      state.outlookSel = i;
+      strip.querySelectorAll(".oh").forEach((x, j) => x.classList.toggle("sel", j === i));
+      $("outlook-detail").innerHTML =
+        `<b>${h.t}</b> — ${h.mm.toFixed(1)} mm expected · ${h.prob}% chance · ${h.cloud}% cloud · ${WMO_TXT(h.code)}`;
+    };
+    strip.appendChild(cell);
+  });
+  $("outlook-detail").textContent = "tap an hour for the exact numbers";
+}
+
 /* ----------------------------------------------------------- live city */
 
 async function pollLive() {
@@ -615,14 +764,20 @@ async function pollLive() {
   const l = state.live;
   $("live-rain").innerHTML = `${l.rain_now.toFixed(1)}<small> mm / 15 min</small>`;
   $("live-area").textContent = l.area_label;
+  const sum = l.outlook && l.outlook.summary;
   $("live-under").textContent = l.degraded
     ? "live feed unreachable — showing zero-rain baseline (DEGRADED)"
     : l.rain_now >= 4 ? `heavy rain over ${l.area_label} right now`
     : l.rain_now > 0.2 ? `raining over ${l.area_label} right now`
+    : sum && (sum.level === "storm-inbound" || sum.level === "rain-soon")
+      ? `dry over ${l.area_label} — but rain is on the way (see forecast)`
+    : sum && sum.level === "overcast" ? `dry over ${l.area_label} — heavy cloud overhead`
     : `dry over ${l.area_label} right now`;
   $("live-3h").textContent = l.past_3h_total.toFixed(1);
   $("live-next").textContent = l.next.reduce((a, b) => a + b, 0).toFixed(1);
   $("live-tide").textContent = l.tide_est.toFixed(1);
+  renderSky();
+  renderOutlook();
 
   const cv = $("live-chart");
   if (cv.clientWidth) {
@@ -676,9 +831,13 @@ async function pollRegion() {
   for (const a of rows) {
     const div = document.createElement("div");
     div.className = "region-row";
+    const rising = (a.risk_next_pct || 0) - a.risk_pct >= 8;
+    const fc = (a.next6_mm || 0) >= 0.5 ? ` · <b class="rr-fc">+${a.next6_mm.toFixed(1)} fc</b>` : "";
     div.innerHTML = `<span class="rr-risk" style="color:${TIER_COL[a.tier]}">${a.risk_pct}%</span>
+      ${rising ? `<span class="rr-next" style="color:${TIER_COL[a.tier_next]}">▲${a.risk_next_pct}%</span>` : ""}
       <span class="rr-name">${a.label}</span>
-      <span class="rr-rain">${a.rain_now.toFixed(1)} mm ·  3h ${a.past_3h.toFixed(1)}</span>`;
+      <span class="rr-rain">${a.rain_now.toFixed(1)} mm · 3h ${a.past_3h.toFixed(1)}${fc}</span>`;
+    if (rising) div.title = `forecast: risk climbs to ${a.risk_next_pct}% within 6 h (${a.next6_mm} mm expected)`;
     div.onclick = async () => {
       clearLocalRun();
       await control({ action: "load", area: a.id });
@@ -699,7 +858,7 @@ async function pollRegion() {
       radius: 6 + a.risk_pct / 14, color: col, weight: 2,
       fillColor: col, fillOpacity: 0.25, bubblingMouseEvents: false,
     }).addTo(map)
-      .bindTooltip(`${a.label} — ${a.risk_pct}% · ${a.rain_now.toFixed(1)} mm now`, { direction: "top" });
+      .bindTooltip(`${a.label} — ${a.risk_pct}%${(a.risk_next_pct || 0) - a.risk_pct >= 8 ? ` ▲${a.risk_next_pct}% by +6h` : ""} · ${a.rain_now.toFixed(1)} mm now${(a.next6_mm || 0) >= 0.5 ? ` · +${a.next6_mm} mm fc` : ""}`, { direction: "top" });
     m.on("click", async () => {
       clearLocalRun();
       await control({ action: "load", area: a.id });
@@ -714,11 +873,14 @@ async function pollRegion() {
 function enterLive() {
   state.mode = "live";
   $("live-dot").hidden = false;
+  heatPill();
+  if (state.live) { renderSky(); renderOutlook(); }   // instant paint from cache
   pollLive();
   pollRegion();
   if (!state.liveTimer) state.liveTimer = setInterval(pollLive, 60000);
   if (!state.regionTimer) state.regionTimer = setInterval(pollRegion, 120000);
   // pull back to the whole Mumbai Metropolitan Region
+  map.setMinZoom(10);
   if (state.region && state.region.areas.length) {
     map.fitBounds(L.latLngBounds(state.region.areas.map((a) => a.center)).pad(0.18));
   } else {
@@ -731,9 +893,12 @@ function enterLive() {
 
 function exitLive() {
   state.mode = "replay";
+  $("sb-sky").hidden = true;
+  heatPill();
   for (const m of state.regionMarkers) map.removeLayer(m);
   state.regionMarkers = [];
   if (state.regionTimer) { clearInterval(state.regionTimer); state.regionTimer = null; }
+  map.setMinZoom(13);
   if (state.meta) map.setView(state.meta.area.center, state.meta.area.zoom);
   renderMap();
   if (state.snap) renderTop();
@@ -890,10 +1055,23 @@ document.querySelectorAll(".tab").forEach((b) => {
 });
 
 $("legend-toggle").onclick = () => { $("legend").hidden = !$("legend").hidden; };
+
+function heatPill() {
+  const el = $("heat-toggle");
+  el.textContent = state.mode === "live"
+    ? { now: "Heat · rain now", fc: "Heat · next 6 h", off: "Heat · off" }[state.heatMode]
+    : `Heatmap · ${state.heatMode === "off" ? "off" : "on"}`;
+  el.classList.toggle("on", state.heatMode !== "off");
+  el.classList.toggle("fc", state.mode === "live" && state.heatMode === "fc");
+}
+
 $("heat-toggle").onclick = () => {
-  state.heatOn = !state.heatOn;
-  $("heat-toggle").textContent = `Heatmap · ${state.heatOn ? "on" : "off"}`;
-  $("heat-toggle").classList.toggle("on", state.heatOn);
+  // in LIVE the pill cycles now → forecast → off; in replay it just toggles
+  state.heatMode = state.mode === "live"
+    ? (state.heatMode === "now" ? "fc" : state.heatMode === "fc" ? "off" : "now")
+    : (state.heatMode === "off" ? "now" : "off");
+  state.heatOn = state.heatMode !== "off";
+  heatPill();
   updateHeat();
 };
 // KPI tiles are doors, not decorations
