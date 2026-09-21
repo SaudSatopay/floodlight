@@ -136,7 +136,10 @@ def fetch_open_meteo(lat: float, lng: float) -> dict:
             "next": vals[13:], "time": times[12] if len(times) > 12 else "",
             "cloud_now": int(cur.get("cloud_cover", 0) or 0),
             "code_now": int(cur.get("weather_code", 0) or 0),
-            "hours": hours}
+            "hours": hours,
+            # Copernicus DEM cell height — 0 over sea/creeks, so it doubles
+            # as the land/water gate for tap-anywhere risk
+            "elevation": float(data.get("elevation", 0) or 0)}
 
 
 # WMO weather interpretation codes → the words a ward officer would use.

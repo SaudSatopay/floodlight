@@ -142,7 +142,7 @@ def live_risk_at(lat: float, lng: float, rain_ctx: dict) -> dict:
     proximity = 1.0 if dist_m <= 120 else max(0.35, 1.0 - (dist_m - 120) / 600.0)
     p = max(0.02, min(0.97, p * proximity))
     return {
-        "covered": True,
+        "covered": True, "grade": "corridor",
         "probability": round(p, 2),
         "tier": "HIGH" if p >= 0.6 else "MODERATE" if p >= 0.3 else "LOW",
         "segment_id": seg.id, "segment": seg.name,
@@ -153,6 +153,41 @@ def live_risk_at(lat: float, lng: float, rain_ctx: dict) -> dict:
         "bowl": seg.bowl, "drain": seg.drain_id, "drain_health": 95,
         "tide_lock": round(tide_lock(tide), 2),
         "anchor": near["anchor"],
+    }
+
+
+def estimate_risk_at(lat: float, lng: float, rain_ctx: dict, near: dict) -> dict:
+    """Tap-anywhere fallback for un-instrumented LAND: the same hydrology,
+    fed the real rain AT the tapped point and a typical Mumbai street
+    profile. Honestly graded 'estimate' — it never impersonates street
+    data, and the popup names the nearest instrumented corridor."""
+    import math
+    seg = Segment(id="__est__", name="area estimate", bowl=1.0,
+                  drain_id="", subscribers=0)
+    cap, belief = 22.0, 0.05
+    past = list(rain_ctx.get("past", []))
+    nxt = list(rain_ctx.get("next", []))[:4]
+    tide = float(rain_ctx.get("tide", 2.5))
+    depth = 0.0
+    for mm in past:
+        depth = step_depth_cm(depth, mm, tide, seg, cap, belief)
+    proj = peak = depth
+    for mm in nxt:
+        proj = step_depth_cm(proj, mm, tide, seg, cap, belief)
+        peak = max(peak, proj)
+    p = 1.0 / (1.0 + math.exp(-(peak - 12.0) / 6.0))
+    p = max(0.02, min(0.97, p))
+    return {
+        "covered": True, "grade": "estimate",
+        "probability": round(p, 2),
+        "tier": "HIGH" if p >= 0.6 else "MODERATE" if p >= 0.3 else "LOW",
+        "projected_peak_cm": round(peak, 1),
+        "rain_next_hour_mm": round(sum(nxt), 1),
+        "tide_lock": round(tide_lock(tide), 2),
+        "bowl": 1.0,
+        "nearest": {"segment": near["segment"], "area_label": near["area_label"],
+                    "distance_m": near["distance_m"]},
+        "anchor": {"lat": lat, "lng": lng},
     }
 
 
@@ -362,6 +397,7 @@ class StormReplay:
         tier = "HIGH" if p >= 0.6 else "MODERATE" if p >= 0.3 else "LOW"
         return {
             "covered": True,
+            "grade": "corridor",
             "probability": round(p, 2),
             "tier": tier,
             "segment_id": best,

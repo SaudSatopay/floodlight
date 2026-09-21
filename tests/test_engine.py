@@ -226,6 +226,20 @@ class TestRiskAt:
         # and the open sea is still out of coverage
         assert live_risk_at(18.95, 72.70, ctx)["covered"] is False
 
+    def test_area_estimate_scores_uninstrumented_land(self):
+        # tap-anywhere on land must ALWAYS answer — graded honestly
+        from floodlight.engine.replay import estimate_risk_at, nearest_street_all_areas
+        near = nearest_street_all_areas(19.117, 72.936)     # Kanjurmarg
+        dry = estimate_risk_at(19.117, 72.936,
+                               {"past": [0.0] * 13, "next": [0.0] * 4, "tide": 2.0}, near)
+        assert dry["covered"] is True and dry["grade"] == "estimate"
+        assert dry["tier"] == "LOW"
+        storm = estimate_risk_at(19.117, 72.936,
+                                 {"past": [22.0] * 13, "next": [30.0] * 4, "tide": 4.4}, near)
+        assert storm["probability"] > dry["probability"]
+        assert storm["tier"] in ("MODERATE", "HIGH")
+        assert storm["nearest"]["distance_m"] == near["distance_m"]
+
 
 class TestSkyOutlook:
     """The forecast verdict: a black-cloud afternoon must SAY so before the

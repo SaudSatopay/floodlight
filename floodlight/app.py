@@ -27,7 +27,8 @@ from .engine.livefeed import (LiveMCGMFeed, fetch_open_meteo, fetch_open_meteo_g
                               fetch_open_meteo_region, live_mode_enabled, mumbai_grid,
                               summarize_outlook, wmo_label,
                               tide_estimate)
-from .engine.replay import (AREAS, STORMS, StormReplay, live_risk_at,
+from .engine.replay import (AREAS, COVERAGE_RADIUS_M, STORMS, StormReplay,
+                            estimate_risk_at, live_risk_at,
                             nearest_street_all_areas)
 from .engine.whatsapp import Outbox, guess_depth_cm, parse_messages, verify_token
 
@@ -221,6 +222,20 @@ async def sensor(req: Request) -> JSONResponse:
 
 
 _live_cache: dict = {"ts": 0.0, "payload": None}
+_pt_met_cache: dict = {}
+
+
+def _point_met(lat: float, lng: float) -> dict:
+    """Rain + terrain elevation for an arbitrary tapped point, cached on a
+    ~1 km grid for 10 min — powers tap-anywhere estimates off-corridor."""
+    key = (round(lat, 2), round(lng, 2))
+    now = _time.time()
+    hit = _pt_met_cache.get(key)
+    if hit and now - hit[0] < 600:
+        return hit[1]
+    m = fetch_open_meteo(lat, lng)
+    _pt_met_cache[key] = (now, m)
+    return m
 
 
 @app.get("/api/live")
@@ -382,14 +397,29 @@ async def risk(lat: float, lng: float, mode: str = "replay") -> JSONResponse:
         rain_ctx = {"past": met["past"], "next": met["next"], "tide": met["tide_est"]}
     result = hub.replay.risk_at(lat, lng, rain_ctx)
     if mode == "live" and result.get("covered") is False:
-        # the loaded ward doesn't cover this tap — but one of the OTHER
-        # pilot corridors might. Score it there, with that corridor's own
-        # real rain when the region feed has it.
+        # The loaded ward doesn't cover this tap. Tier 2: another pilot
+        # corridor might (scored with ITS real rain). Tier 3: any other
+        # LAND point gets an honest AREA ESTIMATE from the rain at that
+        # exact spot; only open water refuses to invent a number.
         near = nearest_street_all_areas(lat, lng)
-        m2 = _region_met.get(near["area_id"])
-        ctx2 = ({"past": m2["past"] + [m2["now"]], "next": m2["next"],
-                 "tide": rain_ctx["tide"]} if m2 else rain_ctx)
-        result = live_risk_at(lat, lng, ctx2)
+        if near["distance_m"] <= COVERAGE_RADIUS_M:
+            m2 = _region_met.get(near["area_id"])
+            ctx2 = ({"past": m2["past"] + [m2["now"]], "next": m2["next"],
+                     "tide": rain_ctx["tide"]} if m2 else rain_ctx)
+            result = live_risk_at(lat, lng, ctx2)
+        else:
+            loop = asyncio.get_running_loop()
+            try:
+                pm = await loop.run_in_executor(None, _point_met, lat, lng)
+            except Exception:
+                pm = None
+            if pm and pm.get("elevation", 0) > 0.5:
+                ctx3 = {"past": pm["past"] + [pm["now"]], "next": pm["next"],
+                        "tide": rain_ctx["tide"]}
+                result = estimate_risk_at(lat, lng, ctx3, near)
+                result["elevation_m"] = round(pm["elevation"], 1)
+            else:
+                result = {"covered": False, "water": pm is not None, **near}
     result["mode"] = mode
     if mode == "live" and result.get("covered", True):
         cached = _live_cache["payload"]

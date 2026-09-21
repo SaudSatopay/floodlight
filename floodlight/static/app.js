@@ -627,15 +627,17 @@ function updateClouds() {
 
 /* ---------------------------------------------------- tap-anywhere risk */
 
+const fmtDist = (m) => (m >= 1500 ? `${(m / 1000).toFixed(1)} km` : `${m} m`);
+
 function riskPopupHtml(r) {
   if (r.covered === false) {
-    const d = r.distance_m >= 1500 ? `${(r.distance_m / 1000).toFixed(1)} km` : `${r.distance_m} m`;
     return `<div class="risk-pop">
-      <div class="rp-head">OUTSIDE MONITORED STREETS</div>
-      <div class="rp-nc">Nothing here to waterlog — this point is <b>${d}</b> from the nearest
-        monitored street, <b>${r.segment}</b>${r.area_label ? ` (${r.area_label})` : ""}.</div>
-      <div class="rp-note">FLOODLIGHT scores streets & drains. Open water and ground it doesn't
-        instrument never get an invented percentage.</div>
+      <div class="rp-head">${r.water ? "OPEN WATER" : "OUTSIDE MONITORED STREETS"}</div>
+      <div class="rp-nc">${r.water ? "Seas, creeks and lakes don't waterlog — no percentage here."
+        : "Nothing here to waterlog."} Nearest monitored street:
+        <b>${r.segment}</b>${r.area_label ? ` (${r.area_label})` : ""} · <b>${fmtDist(r.distance_m)}</b>.</div>
+      <div class="rp-note">FLOODLIGHT scores streets & drains — it never invents a percentage
+        for water.</div>
     </div>`;
   }
   const col = r.tier === "HIGH" ? "#e4574c" : r.tier === "MODERATE" ? "#e0a83c" : "#4fc1d4";
@@ -644,6 +646,22 @@ function riskPopupHtml(r) {
     <div class="rp-driver"><span>${label}</span>
       <div class="rp-track"><i style="width:${Math.round(Math.min(1, frac) * 100)}%"></i></div>
       <b>${val}</b></div>`;
+  if (r.grade === "estimate") {
+    return `<div class="risk-pop">
+      <div class="rp-head">WATERLOGGING PROBABILITY <span class="rp-est">AREA ESTIMATE</span></div>
+      <div class="rp-line"><span class="rp-big" style="color:${col}">${pct}%</span>
+        <span class="rp-tier" style="color:${col};border-color:${col}">${r.tier}</span></div>
+      <div class="rp-sub">no instrumented street here — scored from the real rain at
+        <b>this exact spot</b> + a typical Mumbai street profile${r.elevation_m != null ? ` · ground ~${r.elevation_m} m` : ""}</div>
+      ${bar("projected peak", r.projected_peak_cm / 45, r.projected_peak_cm + " cm")}
+      ${bar("rain next hour", r.rain_next_hour_mm / 60, r.rain_next_hour_mm + " mm")}
+      ${bar("tide lock", r.tide_lock, Math.round(r.tide_lock * 100) + "%")}
+      <div class="rp-sub">nearest instrumented street: <b>${r.nearest.segment}</b>
+        (${r.nearest.area_label}) · ${fmtDist(r.nearest.distance_m)}</div>
+      <div class="rp-note">computed from today's REAL rain · corridor-grade answers need a
+        mapped corridor — that's onboarding, not modelling</div>
+    </div>`;
+  }
   return `<div class="risk-pop">
     <div class="rp-head">WATERLOGGING PROBABILITY</div>
     <div class="rp-line"><span class="rp-big" style="color:${col}">${pct}%</span>
