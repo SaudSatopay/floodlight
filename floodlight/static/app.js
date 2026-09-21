@@ -539,11 +539,12 @@ function updateHeat() {
 const SAT_WMS = "https://view.eumetsat.int/geoserver/wms";
 const SAT_LAYER = "msg_iodc:ir108";
 
-// subtle mode — region zoom: clouds present; street zoom: streets win
+// subtle look — region zoom: clouds present; street zoom: streets win
 const satOpacity = () => (map.getZoom() >= 13 ? 0.3 : 0.45);
-function satZoomOpacity() {
-  if (state.satLayer && state.cloudMode !== "sat") state.satLayer.setOpacity(satOpacity());
-}
+// satellite mode only takes the frame over at true weather zooms — any
+// closer and it yields to the subtle veil so the map always stays readable
+const SAT_FULL_MAX_Z = 9;
+function satZoomOpacity() { updateClouds(); }
 
 function refreshSatClouds() {
   // bump the cache-buster every 10 min so the browser pulls fresh frames
@@ -559,7 +560,7 @@ function updateClouds() {
   if (!window.L) return;
   const live = state.mode === "live" && state.cloudMode !== "off";
   const sat = live && !state.satDead;
-  const full = state.cloudMode === "sat";
+  const full = state.cloudMode === "sat" && map.getZoom() <= SAT_FULL_MAX_Z;
 
   // 1 · satellite imagery — the actual clouds. Two looks:
   //     "sat"    — full IMD-style imagery, basemap dimmed to a ghost
@@ -589,7 +590,8 @@ function updateClouds() {
       state.satLayer._container.classList.toggle("sat-full", full);
     state.satLayer.setOpacity(full ? 0.85 : satOpacity());
     baseTiles.setOpacity(full ? 0.45 : 1);
-    $("cloud-toggle").title = "real clouds · Meteosat-9 infrared (10.8 µm) · EUMETSAT · ~15-min frames";
+    $("cloud-toggle").title = "real clouds · Meteosat-9 infrared (10.8 µm) · EUMETSAT · ~15-min frames"
+      + (state.cloudMode === "sat" ? " · full imagery when zoomed out, subtle over streets" : "");
   } else {
     if (state.satLayer) {
       map.off("zoomend", satZoomOpacity);

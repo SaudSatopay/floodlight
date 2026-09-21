@@ -111,11 +111,12 @@ of rain underneath; tap any hour for the exact numbers. The rain heatmap gains a
 tap on the heat pill) that paints where the *coming* rain will fall, the MMR strip shows each corridor's
 forecast (**34% now ▲ 78% within 6 h** when risk is climbing), and the tap-anywhere probability card
 carries a labelled forecast line. And the clouds on the map are **the real ones**: Meteosat-9 infrared
-satellite imagery (EUMETSAT's open WMS, ~15-minute frames) screen-blended over the dark tiles, so the
-actual cloud bank sitting over the city is visible on the instrument — with the 42-point cloud-cover
-grid as an automatic fallback, and cloud cover still driving the FX deck so an 84%-overcast afternoon
-darkens the map before a single gauge ticks. Every forecast value is labelled as a forecast; nothing
-pretends to be a measurement.
+satellite imagery (EUMETSAT's open WMS, ~15-minute frames). The layer is zoom-aware so the instrument
+never drowns — over streets it rides as a subtle screen-blended glow, and when you pull out to true
+weather zooms it takes the frame like a forecaster's satellite loop; the 42-point cloud-cover grid is
+the automatic fallback, and cloud cover still drives the FX deck so an 84%-overcast afternoon darkens
+the map before a single gauge ticks. Every forecast value is labelled as a forecast; nothing pretends
+to be a measurement.
 
 **Tap anywhere → waterlogging probability.** Click any point on the map and FLOODLIGHT returns a
 calculated probability for that exact spot — a calibrated logistic over the projected peak depth of the
