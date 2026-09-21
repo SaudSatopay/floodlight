@@ -26,8 +26,11 @@ const state = {
   heatMode: "now",              // live heat: "now" | "fc" (next 6 h) | "off"
   outlookSel: -1,               // tapped hour in the 12-h outlook strip
   heatLayer: null,
-  cloudsOn: true,               // live cloud-cover veil over the map
-  cloudLayer: null,
+  cloudsOn: true,               // live cloud layer over the map
+  cloudLayer: null,             // fallback veil (Open-Meteo cloud-cover grid)
+  satLayer: null,               // the REAL clouds: Meteosat IR via EUMETSAT WMS
+  satDead: false, satErr: 0,    // tile-error fallback bookkeeping
+  satBucket: 0,                 // 10-min bucket → forces fresh frames
   riskPin: null,
   region: null,
   regionMarkers: [],
@@ -531,10 +534,57 @@ function updateHeat() {
   updateClouds();
 }
 
+// EUMETSAT open WMS: Meteosat-9 (Indian Ocean) 10.8 µm infrared — the
+// actual clouds over Mumbai, day & night, ~15-minute frames, no key.
+const SAT_WMS = "https://view.eumetsat.int/geoserver/wms";
+const SAT_LAYER = "msg_iodc:ir108";
+
+function refreshSatClouds() {
+  // bump the cache-buster every 10 min so the browser pulls fresh frames
+  const bucket = Math.floor(Date.now() / 600000);
+  if (state.satLayer && bucket !== state.satBucket) {
+    state.satBucket = bucket;
+    state.satLayer.setParams({ t: bucket });
+  }
+  updateClouds();
+}
+
 function updateClouds() {
-  // LIVE cloud cover as a soft white veil (screen-blended over the dark
-  // tiles) — the sky the user sees out the window, painted on the map
-  if (!window.L || !L.heatLayer) return;
+  if (!window.L) return;
+  const live = state.mode === "live" && state.cloudsOn;
+  const sat = live && !state.satDead;
+
+  // 1 · satellite imagery — actual cloud shapes, screen-blended so warm
+  //     ground (dark in IR) vanishes and cloud tops glow over the map
+  if (sat) {
+    if (!state.satLayer) {
+      state.satBucket = Math.floor(Date.now() / 600000);
+      state.satLayer = L.tileLayer.wms(SAT_WMS, {
+        layers: SAT_LAYER, format: "image/png", transparent: true,
+        version: "1.1.1", opacity: 0.5, className: "sat-clouds",
+        keepBuffer: 4, updateWhenZooming: false, maxNativeZoom: 11,
+        attribution: 'clouds © <a href="https://view.eumetsat.int">EUMETSAT</a> Meteosat IR',
+        t: state.satBucket,
+      }).addTo(map);
+      state.satErr = 0;
+      state.satLayer.on("tileerror", () => {
+        // a run of failures = feed down → fall back to the data veil
+        if (++state.satErr >= 6 && !state.satDead) {
+          state.satDead = true;
+          updateClouds();
+        }
+      });
+      state.satLayer.on("tileload", () => { state.satErr = 0; });
+    }
+    $("cloud-toggle").title = "real clouds · Meteosat-9 infrared (10.8 µm) · EUMETSAT · ~15-min frames";
+  } else if (state.satLayer) {
+    map.removeLayer(state.satLayer);
+    state.satLayer = null;
+  }
+
+  // 2 · fallback veil from the 42-pt cloud-cover grid — only when the
+  //     satellite feed is unreachable (still real data, just interpolated)
+  if (!L.heatLayer) return;
   if (!state.cloudLayer) {
     state.cloudLayer = L.heatLayer([], {
       radius: 90, blur: 70, maxZoom: 12, max: 1.0,
@@ -546,7 +596,7 @@ function updateClouds() {
       map.getPanes().overlayPane.appendChild(state.heatLayer._canvas);
   }
   const pts = [];
-  if (state.mode === "live" && state.cloudsOn && state.live && state.live.heat) {
+  if (live && !sat && state.live && state.live.heat) {
     for (const h of state.live.heat) {
       if ((h.cloud || 0) >= 12) pts.push([h.lat, h.lng, h.cloud / 100]);
     }
@@ -804,6 +854,7 @@ async function pollLive() {
   $("live-tide").textContent = l.tide_est.toFixed(1);
   renderSky();
   renderOutlook();
+  refreshSatClouds();
 
   const cv = $("live-chart");
   if (cv.clientWidth) {

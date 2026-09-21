@@ -189,9 +189,10 @@
         <button id="fx-preview" class="ctl wide" style="margin:10px 16px 0; width:calc(100% - 32px)">☔ Preview downpour FX (visuals only)</button>
 
         <p class="live-note" id="live-note">
-          rainfall, sky & the cloud veil on the map — real, <b>open-meteo.com</b> (15-minutely + hourly
-          forecast + live cloud cover on a 42-point MMR grid) · tide — approximate semidiurnal estimate ·
-          street shading — the same hydrology model, fed today's actual rain.
+          rainfall & sky — real, <b>open-meteo.com</b> (15-minutely + hourly forecast) · clouds on the map —
+          <b>real satellite imagery</b>: Meteosat-9 infrared via EUMETSAT's open WMS, ~15-min frames
+          (falls back to the 42-point cloud-cover grid if unreachable) · tide — approximate semidiurnal
+          estimate · street shading — the same hydrology model, fed today's actual rain.
           Forecast bars and "expected ~time" lines are model forecasts, labelled as such. The preview button
           above plays the rain/lightning visuals without touching any data. Citizen reports & the hardware
           node stream in through the same channels as the replay.

@@ -123,6 +123,14 @@ small { font-size: 0.68em; color: var(--sub); font-weight: 400; }
 
 /* live cloud-cover veil: glows white over the dark tiles, stays soft */
 .cloud-canvas { opacity: 0.5; mix-blend-mode: screen; filter: blur(5px); pointer-events: none; }
+
+/* REAL clouds — Meteosat IR tiles. In IR, warm ground is dark and cloud
+   tops are bright: contrast sinks the ground, screen blend erases it,
+   and only the actual clouds glow over the instrument map. */
+.sat-clouds {
+  mix-blend-mode: screen; pointer-events: none;
+  filter: contrast(1.55) brightness(0.98) blur(0.3px);
+}
 #map-hint { left: 12px; top: 12px; color: var(--teal); border-color: #14454f; cursor: default; }
 .overlay-pill.soft { text-transform: none; letter-spacing: 0.04em; font-size: 10px; }
 

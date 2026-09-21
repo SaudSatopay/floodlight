@@ -278,6 +278,13 @@ def fetch_open_meteo_region(points: list[tuple[float, float]]) -> list[dict]:
     return out
 
 
+# Real cloud imagery on the map comes straight from EUMETSAT's open WMS
+# (view.eumetsat.int, keyless): Meteosat-9 IODC sits over the Indian Ocean,
+# so its 10.8 µm infrared channel IS the live cloud picture over Mumbai,
+# day and night, ~15-minute frames. The client consumes it as a Leaflet
+# WMS layer directly — no key, no proxy, no scraping.
+
+
 def tide_estimate() -> float:
     """Approximate semidiurnal tide for Mumbai (labelled EST in the UI) —
     a 12.4 h cycle between ~1.2 m and ~4.4 m. Good enough to show the
