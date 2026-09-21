@@ -133,6 +133,17 @@ small { font-size: 0.68em; color: var(--sub); font-weight: 400; }
   mix-blend-mode: screen; pointer-events: none;
   filter: contrast(2.6) brightness(0.7) blur(0.3px);
 }
+
+/* SATELLITE mode — the IMD look: the imagery IS the picture. No blend
+   tricks, near-natural contrast; the basemap dims to a ghost beneath so
+   coastlines and corridor markers still register. */
+.sat-clouds.sat-full {
+  mix-blend-mode: normal;
+  /* the source is ~4 km/px — the blur melts nearest-neighbour blocks into
+     the soft gradients a satellite loop is supposed to have */
+  filter: contrast(1.4) brightness(0.78) blur(3px);
+}
+#map .leaflet-layer { transition: opacity 0.5s; }
 #map-hint { left: 12px; top: 12px; color: var(--teal); border-color: #14454f; cursor: default; }
 .overlay-pill.soft { text-transform: none; letter-spacing: 0.04em; font-size: 10px; }
 

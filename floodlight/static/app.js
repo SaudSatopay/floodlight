@@ -26,7 +26,7 @@ const state = {
   heatMode: "now",              // live heat: "now" | "fc" (next 6 h) | "off"
   outlookSel: -1,               // tapped hour in the 12-h outlook strip
   heatLayer: null,
-  cloudsOn: true,               // live cloud layer over the map
+  cloudMode: "sat",             // live clouds: "sat" (full imagery) | "subtle" | "off"
   cloudLayer: null,             // fallback veil (Open-Meteo cloud-cover grid)
   satLayer: null,               // the REAL clouds: Meteosat IR via EUMETSAT WMS
   satDead: false, satErr: 0,    // tile-error fallback bookkeeping
@@ -47,7 +47,7 @@ const map = L.map("map", {
 
 L.control.zoom({ position: "bottomright" }).addTo(map);
 
-L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+const baseTiles = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
   attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
   className: "dark-tiles",
   maxZoom: 19,
@@ -489,7 +489,7 @@ function renderSummary() {
 
 function renderHints() {
   const s = state.snap;
-  if (state.mode === "live") { setHint("LIVE CITY: real rainfall over this ward, updated every 15 minutes. Streets shade from today's actual rain."); return; }
+  if (state.mode === "live") { setHint("LIVE CITY: real rain + real satellite clouds. Zoom OUT to watch the whole system move in — the Clouds pill switches satellite/subtle/off."); return; }
   if (s.step < 0) setHint("Pick an AREA and a STORM — 26 July 2005 is in the library. Or open Live city for real weather.");
   else if (!s.finished && !state.mapHintDone) setHint("Watch the map change colour — then tap any street to see WHY it floods.");
   else if (!s.finished) setHint("Amber dashes = a blocked drain the engine diagnosed. Open Feed for the dispatch order.");
@@ -539,9 +539,11 @@ function updateHeat() {
 const SAT_WMS = "https://view.eumetsat.int/geoserver/wms";
 const SAT_LAYER = "msg_iodc:ir108";
 
-// region zoom: clouds present; street zoom: streets win, clouds whisper
+// subtle mode — region zoom: clouds present; street zoom: streets win
 const satOpacity = () => (map.getZoom() >= 13 ? 0.3 : 0.45);
-function satZoomOpacity() { if (state.satLayer) state.satLayer.setOpacity(satOpacity()); }
+function satZoomOpacity() {
+  if (state.satLayer && state.cloudMode !== "sat") state.satLayer.setOpacity(satOpacity());
+}
 
 function refreshSatClouds() {
   // bump the cache-buster every 10 min so the browser pulls fresh frames
@@ -555,11 +557,13 @@ function refreshSatClouds() {
 
 function updateClouds() {
   if (!window.L) return;
-  const live = state.mode === "live" && state.cloudsOn;
+  const live = state.mode === "live" && state.cloudMode !== "off";
   const sat = live && !state.satDead;
+  const full = state.cloudMode === "sat";
 
-  // 1 · satellite imagery — actual cloud shapes, screen-blended so warm
-  //     ground (dark in IR) vanishes and cloud tops glow over the map
+  // 1 · satellite imagery — the actual clouds. Two looks:
+  //     "sat"    — full IMD-style imagery, basemap dimmed to a ghost
+  //     "subtle" — crushed + screen-blended, streets first
   if (sat) {
     if (!state.satLayer) {
       state.satBucket = Math.floor(Date.now() / 600000);
@@ -581,11 +585,18 @@ function updateClouds() {
       });
       state.satLayer.on("tileload", () => { state.satErr = 0; });
     }
+    if (state.satLayer._container)
+      state.satLayer._container.classList.toggle("sat-full", full);
+    state.satLayer.setOpacity(full ? 0.85 : satOpacity());
+    baseTiles.setOpacity(full ? 0.45 : 1);
     $("cloud-toggle").title = "real clouds · Meteosat-9 infrared (10.8 µm) · EUMETSAT · ~15-min frames";
-  } else if (state.satLayer) {
-    map.off("zoomend", satZoomOpacity);
-    map.removeLayer(state.satLayer);
-    state.satLayer = null;
+  } else {
+    if (state.satLayer) {
+      map.off("zoomend", satZoomOpacity);
+      map.removeLayer(state.satLayer);
+      state.satLayer = null;
+    }
+    baseTiles.setOpacity(1);
   }
 
   // 2 · fallback veil from the 42-pt cloud-cover grid — only when the
@@ -957,14 +968,16 @@ function enterLive() {
   state.mode = "live";
   $("live-dot").hidden = false;
   heatPill();
+  cloudPill();
   $("cloud-toggle").hidden = false;
   if (state.live) { renderSky(); renderOutlook(); }   // instant paint from cache
   pollLive();
   pollRegion();
   if (!state.liveTimer) state.liveTimer = setInterval(pollLive, 60000);
   if (!state.regionTimer) state.regionTimer = setInterval(pollRegion, 120000);
-  // pull back to the whole Mumbai Metropolitan Region
-  map.setMinZoom(10);
+  // pull back to the whole Mumbai Metropolitan Region — and allow zooming
+  // right out to the Konkan coast, where the satellite view tells its story
+  map.setMinZoom(7);
   if (state.region && state.region.areas.length) {
     map.fitBounds(L.latLngBounds(state.region.areas.map((a) => a.center)).pad(0.18));
   } else {
@@ -1161,10 +1174,15 @@ $("heat-toggle").onclick = () => {
   updateHeat();
 };
 
+function cloudPill() {
+  const el = $("cloud-toggle");
+  el.textContent = { sat: "Clouds · satellite", subtle: "Clouds · subtle", off: "Clouds · off" }[state.cloudMode];
+  el.classList.toggle("on", state.cloudMode !== "off");
+}
+
 $("cloud-toggle").onclick = () => {
-  state.cloudsOn = !state.cloudsOn;
-  $("cloud-toggle").textContent = `Clouds · ${state.cloudsOn ? "on" : "off"}`;
-  $("cloud-toggle").classList.toggle("on", state.cloudsOn);
+  state.cloudMode = state.cloudMode === "sat" ? "subtle" : state.cloudMode === "subtle" ? "off" : "sat";
+  cloudPill();
   updateClouds();
 };
 // KPI tiles are doors, not decorations
