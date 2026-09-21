@@ -348,6 +348,7 @@ async def region() -> JSONResponse:
             "id": aid, "label": AREAS[aid]["label"], "center": AREAS[aid]["center"],
             "rain_now": round(m["now"], 2), "past_3h": round(sum(m["past"]), 1),
             "next6_mm": round(m.get("next6_mm", 0.0), 1),
+            "cloud": m.get("cloud", 0),
             "risk_pct": round(p * 100),
             "risk_next_pct": round(p2 * 100),
             "tier": "HIGH" if p >= 0.6 else "MODERATE" if p >= 0.3 else "LOW",

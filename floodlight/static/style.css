@@ -119,6 +119,10 @@ small { font-size: 0.68em; color: var(--sub); font-weight: 400; }
 .overlay-pill:hover { color: var(--paper); }
 #legend-toggle { left: 12px; bottom: 12px; }
 #heat-toggle { left: 104px; bottom: 12px; }
+#cloud-toggle { left: 244px; bottom: 12px; }
+
+/* live cloud-cover veil: glows white over the dark tiles, stays soft */
+.cloud-canvas { opacity: 0.5; mix-blend-mode: screen; filter: blur(5px); pointer-events: none; }
 #map-hint { left: 12px; top: 12px; color: var(--teal); border-color: #14454f; cursor: default; }
 .overlay-pill.soft { text-transform: none; letter-spacing: 0.04em; font-size: 10px; }
 

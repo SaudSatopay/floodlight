@@ -61,6 +61,7 @@
 
       <button id="legend-toggle" class="overlay-pill">Map key</button>
       <button id="heat-toggle" class="overlay-pill on">Heatmap · on</button>
+      <button id="cloud-toggle" class="overlay-pill on" hidden>Clouds · on</button>
       <div id="legend" class="panel" hidden>
         <span><i class="sw ok"></i> dry / normal</span>
         <span><i class="sw watch"></i> watch — water rising (≥ 8 cm)</span>
@@ -188,8 +189,9 @@
         <button id="fx-preview" class="ctl wide" style="margin:10px 16px 0; width:calc(100% - 32px)">☔ Preview downpour FX (visuals only)</button>
 
         <p class="live-note" id="live-note">
-          rainfall & sky — real, <b>open-meteo.com</b> (15-minutely + hourly forecast) · tide — approximate
-          semidiurnal estimate · street shading — the same hydrology model, fed today's actual rain.
+          rainfall, sky & the cloud veil on the map — real, <b>open-meteo.com</b> (15-minutely + hourly
+          forecast + live cloud cover on a 42-point MMR grid) · tide — approximate semidiurnal estimate ·
+          street shading — the same hydrology model, fed today's actual rain.
           Forecast bars and "expected ~time" lines are model forecasts, labelled as such. The preview button
           above plays the rain/lightning visuals without touching any data. Citizen reports & the hardware
           node stream in through the same channels as the replay.

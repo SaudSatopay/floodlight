@@ -26,6 +26,8 @@ const state = {
   heatMode: "now",              // live heat: "now" | "fc" (next 6 h) | "off"
   outlookSel: -1,               // tapped hour in the 12-h outlook strip
   heatLayer: null,
+  cloudsOn: true,               // live cloud-cover veil over the map
+  cloudLayer: null,
   riskPin: null,
   region: null,
   regionMarkers: [],
@@ -526,6 +528,30 @@ function updateHeat() {
     }
   }
   state.heatLayer.setLatLngs(pts);
+  updateClouds();
+}
+
+function updateClouds() {
+  // LIVE cloud cover as a soft white veil (screen-blended over the dark
+  // tiles) — the sky the user sees out the window, painted on the map
+  if (!window.L || !L.heatLayer) return;
+  if (!state.cloudLayer) {
+    state.cloudLayer = L.heatLayer([], {
+      radius: 90, blur: 70, maxZoom: 12, max: 1.0,
+      gradient: { 0.1: "#232d36", 0.45: "#54646f", 0.75: "#93a5b0", 1.0: "#dfe8ee" },
+    }).addTo(map);
+    if (state.cloudLayer._canvas) state.cloudLayer._canvas.classList.add("cloud-canvas");
+    // rain heat must stay ABOVE the cloud veil — re-append its canvas last
+    if (state.heatLayer && state.heatLayer._canvas)
+      map.getPanes().overlayPane.appendChild(state.heatLayer._canvas);
+  }
+  const pts = [];
+  if (state.mode === "live" && state.cloudsOn && state.live && state.live.heat) {
+    for (const h of state.live.heat) {
+      if ((h.cloud || 0) >= 12) pts.push([h.lat, h.lng, h.cloud / 100]);
+    }
+  }
+  state.cloudLayer.setLatLngs(pts);
 }
 
 /* ---------------------------------------------------- tap-anywhere risk */
@@ -836,7 +862,7 @@ async function pollRegion() {
     div.innerHTML = `<span class="rr-risk" style="color:${TIER_COL[a.tier]}">${a.risk_pct}%</span>
       ${rising ? `<span class="rr-next" style="color:${TIER_COL[a.tier_next]}">▲${a.risk_next_pct}%</span>` : ""}
       <span class="rr-name">${a.label}</span>
-      <span class="rr-rain">${a.rain_now.toFixed(1)} mm · 3h ${a.past_3h.toFixed(1)}${fc}</span>`;
+      <span class="rr-rain">${a.cloud != null ? `☁${a.cloud} · ` : ""}${a.rain_now.toFixed(1)} mm · 3h ${a.past_3h.toFixed(1)}${fc}</span>`;
     if (rising) div.title = `forecast: risk climbs to ${a.risk_next_pct}% within 6 h (${a.next6_mm} mm expected)`;
     div.onclick = async () => {
       clearLocalRun();
@@ -874,6 +900,7 @@ function enterLive() {
   state.mode = "live";
   $("live-dot").hidden = false;
   heatPill();
+  $("cloud-toggle").hidden = false;
   if (state.live) { renderSky(); renderOutlook(); }   // instant paint from cache
   pollLive();
   pollRegion();
@@ -895,6 +922,8 @@ function exitLive() {
   state.mode = "replay";
   $("sb-sky").hidden = true;
   heatPill();
+  $("cloud-toggle").hidden = true;
+  updateClouds();
   for (const m of state.regionMarkers) map.removeLayer(m);
   state.regionMarkers = [];
   if (state.regionTimer) { clearInterval(state.regionTimer); state.regionTimer = null; }
@@ -1073,6 +1102,13 @@ $("heat-toggle").onclick = () => {
   state.heatOn = state.heatMode !== "off";
   heatPill();
   updateHeat();
+};
+
+$("cloud-toggle").onclick = () => {
+  state.cloudsOn = !state.cloudsOn;
+  $("cloud-toggle").textContent = `Clouds · ${state.cloudsOn ? "on" : "off"}`;
+  $("cloud-toggle").classList.toggle("on", state.cloudsOn);
+  updateClouds();
 };
 // KPI tiles are doors, not decorations
 document.querySelectorAll("#kpis .kpi")[0].onclick = () => document.querySelector('[data-tab="feed"]').click();
