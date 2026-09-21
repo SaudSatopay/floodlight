@@ -197,6 +197,17 @@ class TestRiskAt:
         assert dry["tier"] == "LOW"
         assert dry["probability"] <= 0.2
 
+    def test_sea_tap_is_honestly_out_of_coverage(self):
+        # a tap in the Arabian Sea must NOT get an extrapolated percentage
+        r = StormReplay("cloudburst", "hindmata")
+        sea = r.risk_at(18.95, 72.70)
+        assert sea["covered"] is False
+        assert "probability" not in sea and "tier" not in sea
+        assert sea["distance_m"] > 750
+        # …while a point on the corridor still answers with a full breakdown
+        street = r.risk_at(19.01482, 72.84538)
+        assert street["covered"] is True and "probability" in street
+
 
 class TestSkyOutlook:
     """The forecast verdict: a black-cloud afternoon must SAY so before the

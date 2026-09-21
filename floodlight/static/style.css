@@ -447,6 +447,9 @@ small { font-size: 0.68em; color: var(--sub); font-weight: 400; }
 .rr-fc { color: var(--amber); font-weight: 600; font-style: normal; }
 .rr-next { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 10px; font-weight: 600; margin-right: 6px; animation: etaPulse 2.2s ease-in-out infinite; }
 
+.rp-nc { font-size: 11px; color: var(--paper); line-height: 1.55; margin: 7px 0 2px; }
+.rp-nc b { color: var(--teal); font-weight: 600; }
+
 .rp-fc {
   font-family: var(--mono); font-size: 9px; letter-spacing: 0.04em; color: var(--amber);
   border-top: 1px dashed var(--hair2); margin-top: 8px; padding-top: 7px; line-height: 1.5;

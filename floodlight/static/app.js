@@ -628,6 +628,16 @@ function updateClouds() {
 /* ---------------------------------------------------- tap-anywhere risk */
 
 function riskPopupHtml(r) {
+  if (r.covered === false) {
+    const d = r.distance_m >= 1500 ? `${(r.distance_m / 1000).toFixed(1)} km` : `${r.distance_m} m`;
+    return `<div class="risk-pop">
+      <div class="rp-head">OUTSIDE MONITORED STREETS</div>
+      <div class="rp-nc">Nothing here to waterlog — this point is <b>${d}</b> from the nearest
+        monitored street, <b>${r.segment}</b>.</div>
+      <div class="rp-note">FLOODLIGHT scores streets & drains. Open water and ground it doesn't
+        instrument never get an invented percentage.</div>
+    </div>`;
+  }
   const col = r.tier === "HIGH" ? "#e4574c" : r.tier === "MODERATE" ? "#e0a83c" : "#4fc1d4";
   const pct = Math.round(r.probability * 100);
   const bar = (label, frac, val) => `
@@ -655,7 +665,8 @@ async function riskAt(latlng) {
     r = await (await fetch(`/api/risk?lat=${latlng.lat.toFixed(6)}&lng=${latlng.lng.toFixed(6)}&mode=${state.mode}`)).json();
   } catch { return; }
   if (state.riskPin) map.removeLayer(state.riskPin);
-  const col = r.tier === "HIGH" ? "#e4574c" : r.tier === "MODERATE" ? "#e0a83c" : "#4fc1d4";
+  const col = r.covered === false ? "#5c666b"
+    : r.tier === "HIGH" ? "#e4574c" : r.tier === "MODERATE" ? "#e0a83c" : "#4fc1d4";
   state.riskPin = L.circleMarker(latlng, {
     radius: 6, color: col, fillColor: col, fillOpacity: 0.35, weight: 2,
     bubblingMouseEvents: false,

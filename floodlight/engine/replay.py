@@ -67,6 +67,7 @@ AREAS = _load_areas()
 NOWCAST_WINDOWS = 2
 OBSERVATION_FRESH_WINDOWS = 3
 LIVE_SENSOR_FRESH_S = 60.0
+COVERAGE_RADIUS_M = 750.0        # tap-risk answers only near a monitored street
 
 
 def _minutes(step: int) -> int:
@@ -221,6 +222,18 @@ class StormReplay:
         drain = self.drains[seg.drain_id]
         dist_m = 111320.0 * math.sqrt(best_d2)
 
+        # Far from every monitored street — open sea, the creek, a ward we
+        # don't instrument — the honest answer is "not covered here", not a
+        # percentage extrapolated from a street kilometres away.
+        if dist_m > COVERAGE_RADIUS_M:
+            return {
+                "covered": False,
+                "distance_m": round(dist_m),
+                "segment": seg.name,
+                "segment_id": best,
+                "anchor": {"lat": best_pt[0], "lng": best_pt[1]},
+            }
+
         if rain_ctx:
             past = list(rain_ctx.get("past", []))
             nxt = list(rain_ctx.get("next", []))[:4]
@@ -262,6 +275,7 @@ class StormReplay:
 
         tier = "HIGH" if p >= 0.6 else "MODERATE" if p >= 0.3 else "LOW"
         return {
+            "covered": True,
             "probability": round(p, 2),
             "tier": tier,
             "segment_id": best,

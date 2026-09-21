@@ -377,7 +377,7 @@ async def risk(lat: float, lng: float, mode: str = "replay") -> JSONResponse:
         rain_ctx = {"past": met["past"], "next": met["next"], "tide": met["tide_est"]}
     result = hub.replay.risk_at(lat, lng, rain_ctx)
     result["mode"] = mode
-    if mode == "live":
+    if mode == "live" and result.get("covered", True):
         cached = _live_cache["payload"]
         if cached and cached.get("outlook"):
             # the popup's physics stay honest (next-hour rain only) — the
