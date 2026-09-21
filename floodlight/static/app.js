@@ -534,10 +534,12 @@ function updateHeat() {
   updateClouds();
 }
 
-// EUMETSAT open WMS: Meteosat-9 (Indian Ocean) 10.8 µm infrared — the
-// actual clouds over Mumbai, day & night, ~15-minute frames, no key.
+// EUMETSAT open WMS, no key. The layer is their curated GLOBAL mosaic
+// ("Geostationary Ring IR 10.8 µm — Multimission"): seam-free and tonally
+// balanced, unlike the raw per-satellite quicklooks whose scan segments
+// arrive with mismatched stretches (hard black bands mid-frame).
 const SAT_WMS = "https://view.eumetsat.int/geoserver/wms";
-const SAT_LAYER = "msg_iodc:ir108";
+const SAT_LAYER = "mumi:worldcloudmap_ir108";
 
 // subtle look — region zoom: clouds present; street zoom: streets win
 const satOpacity = () => (map.getZoom() >= 13 ? 0.3 : 0.45);
@@ -572,7 +574,7 @@ function updateClouds() {
         layers: SAT_LAYER, format: "image/png", transparent: true,
         version: "1.1.1", opacity: satOpacity(), className: "sat-clouds",
         keepBuffer: 4, updateWhenZooming: false, maxNativeZoom: 11,
-        attribution: 'clouds © <a href="https://view.eumetsat.int">EUMETSAT</a> Meteosat IR',
+        attribution: 'clouds © <a href="https://view.eumetsat.int">EUMETSAT</a> IR mosaic',
         t: state.satBucket,
       }).addTo(map);
       map.on("zoomend", satZoomOpacity);
@@ -590,7 +592,7 @@ function updateClouds() {
       state.satLayer._container.classList.toggle("sat-full", full);
     state.satLayer.setOpacity(full ? 0.85 : satOpacity());
     baseTiles.setOpacity(full ? 0.45 : 1);
-    $("cloud-toggle").title = "real clouds · Meteosat-9 infrared (10.8 µm) · EUMETSAT · ~15-min frames"
+    $("cloud-toggle").title = "real clouds · geostationary-ring infrared mosaic (10.8 µm) · EUMETSAT"
       + (state.cloudMode === "sat" ? " · full imagery when zoomed out, subtle over streets" : "");
   } else {
     if (state.satLayer) {

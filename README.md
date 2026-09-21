@@ -110,8 +110,9 @@ one tappable cell per hour: cloud cover as the cap, expected rain as the bar (te
 of rain underneath; tap any hour for the exact numbers. The rain heatmap gains a **NEXT 6 H mode** (one
 tap on the heat pill) that paints where the *coming* rain will fall, the MMR strip shows each corridor's
 forecast (**34% now ▲ 78% within 6 h** when risk is climbing), and the tap-anywhere probability card
-carries a labelled forecast line. And the clouds on the map are **the real ones**: Meteosat-9 infrared
-satellite imagery (EUMETSAT's open WMS, ~15-minute frames). The layer is zoom-aware so the instrument
+carries a labelled forecast line. And the clouds on the map are **the real ones**: EUMETSAT's
+geostationary-ring infrared mosaic (10.8 µm, open WMS — seam-free and tonally balanced, unlike raw
+per-satellite quicklooks). The layer is zoom-aware so the instrument
 never drowns — over streets it rides as a subtle screen-blended glow, and when you pull out to true
 weather zooms it takes the frame like a forecaster's satellite loop; the 42-point cloud-cover grid is
 the automatic fallback, and cloud cover still drives the FX deck so an 84%-overcast afternoon darkens

@@ -139,9 +139,9 @@ small { font-size: 0.68em; color: var(--sub); font-weight: 400; }
    coastlines and corridor markers still register. */
 .sat-clouds.sat-full {
   mix-blend-mode: normal;
-  /* the source is ~4 km/px — the blur melts nearest-neighbour blocks into
-     the soft gradients a satellite loop is supposed to have */
-  filter: contrast(1.4) brightness(0.78) blur(3px);
+  /* the mosaic arrives tonally balanced — only a light touch here, plus a
+     small blur to melt the coarse source pixels into cloud gradients */
+  filter: contrast(1.18) brightness(0.88) blur(1.5px);
 }
 #map .leaflet-layer { transition: opacity 0.5s; }
 #map-hint { left: 12px; top: 12px; color: var(--teal); border-color: #14454f; cursor: default; }
