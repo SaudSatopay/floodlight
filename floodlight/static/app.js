@@ -633,7 +633,7 @@ function riskPopupHtml(r) {
     return `<div class="risk-pop">
       <div class="rp-head">OUTSIDE MONITORED STREETS</div>
       <div class="rp-nc">Nothing here to waterlog — this point is <b>${d}</b> from the nearest
-        monitored street, <b>${r.segment}</b>.</div>
+        monitored street, <b>${r.segment}</b>${r.area_label ? ` (${r.area_label})` : ""}.</div>
       <div class="rp-note">FLOODLIGHT scores streets & drains. Open water and ground it doesn't
         instrument never get an invented percentage.</div>
     </div>`;
@@ -648,7 +648,7 @@ function riskPopupHtml(r) {
     <div class="rp-head">WATERLOGGING PROBABILITY</div>
     <div class="rp-line"><span class="rp-big" style="color:${col}">${pct}%</span>
       <span class="rp-tier" style="color:${col};border-color:${col}">${r.tier}</span></div>
-    <div class="rp-sub">nearest street: <b>${r.segment}</b> · ${r.distance_m} m away</div>
+    <div class="rp-sub">nearest street: <b>${r.segment}</b> · ${r.distance_m} m away${r.area_label ? ` · ${r.area_label}` : ""}</div>
     ${bar("projected peak", r.projected_peak_cm / 45, r.projected_peak_cm + " cm")}
     ${bar("rain next hour", r.rain_next_hour_mm / 60, r.rain_next_hour_mm + " mm")}
     ${bar("drain risk", (100 - r.drain_health) / 100, r.drain_health + "% health")}

@@ -70,6 +70,92 @@ LIVE_SENSOR_FRESH_S = 60.0
 COVERAGE_RADIUS_M = 750.0        # tap-risk answers only near a monitored street
 
 
+# ---------------------------------------------------------------------------
+# Cross-corridor tap risk. A StormReplay knows one ward; the LIVE map shows
+# eight. These helpers let a tap anywhere in the MMR be scored against the
+# nearest street in ANY pilot corridor — not just the one that happens to be
+# loaded — so a tap at Teen Hath Naka never gets measured against Dadar.
+# ---------------------------------------------------------------------------
+
+_XAREA_CACHE: dict = {}
+
+
+def _area_assets(area_id: str):
+    """Any corridor's streets + drain capacities, loaded once and cached."""
+    if area_id not in _XAREA_CACHE:
+        a = AREAS[area_id]
+        geo = json.loads((a["dir"] / "segments.geojson").read_text(encoding="utf-8"))
+        drains = json.loads((a["dir"] / "drains.json").read_text(encoding="utf-8"))["drains"]
+        caps = {d["id"]: d.get("capacity_mm", 22) for d in drains}
+        segs = []
+        for f in geo["features"]:
+            p = f["properties"]
+            segs.append((Segment(id=p["id"], name=p["name"], bowl=p["bowl"],
+                                 drain_id=p["drain_id"], subscribers=p["subscribers"]),
+                         f["geometry"]["coordinates"]))
+        _XAREA_CACHE[area_id] = (segs, caps)
+    return _XAREA_CACHE[area_id]
+
+
+def nearest_street_all_areas(lat: float, lng: float) -> dict:
+    """The nearest monitored street across every pilot corridor."""
+    import math
+    best = None
+    for aid in AREAS:
+        for seg, coords in _area_assets(aid)[0]:
+            for x, y in coords:
+                d2 = (lat - y) ** 2 + (lng - x) ** 2
+                if best is None or d2 < best[0]:
+                    best = (d2, aid, seg, (y, x))
+    d2, aid, seg, pt = best
+    return {"area_id": aid, "area_label": AREAS[aid]["label"],
+            "segment": seg.name, "segment_id": seg.id,
+            "distance_m": round(111320.0 * math.sqrt(d2)),
+            "anchor": {"lat": pt[0], "lng": pt[1]}}
+
+
+def live_risk_at(lat: float, lng: float, rain_ctx: dict) -> dict:
+    """LIVE-mode tap risk for the whole MMR: same logistic as risk_at, run
+    on the nearest street in ANY corridor with a healthy-drain baseline
+    (live mode only learns drain beliefs for the loaded ward)."""
+    import math
+    near = nearest_street_all_areas(lat, lng)
+    if near["distance_m"] > COVERAGE_RADIUS_M:
+        return {"covered": False, **near}
+    segs, caps = _area_assets(near["area_id"])
+    seg = next(s for s, _ in segs if s.id == near["segment_id"])
+    cap = caps.get(seg.drain_id, 22)
+    belief = 0.05
+    past = list(rain_ctx.get("past", []))
+    nxt = list(rain_ctx.get("next", []))[:4]
+    tide = float(rain_ctx.get("tide", 2.5))
+    depth = 0.0
+    for mm in past:
+        depth = step_depth_cm(depth, mm, tide, seg, cap, belief)
+    proj = peak = depth
+    for mm in nxt:
+        proj = step_depth_cm(proj, mm, tide, seg, cap, belief)
+        peak = max(peak, proj)
+    p = 1.0 / (1.0 + math.exp(-(peak - 12.0) / 6.0))
+    p *= 1.0 + 0.35 * belief
+    dist_m = near["distance_m"]
+    proximity = 1.0 if dist_m <= 120 else max(0.35, 1.0 - (dist_m - 120) / 600.0)
+    p = max(0.02, min(0.97, p * proximity))
+    return {
+        "covered": True,
+        "probability": round(p, 2),
+        "tier": "HIGH" if p >= 0.6 else "MODERATE" if p >= 0.3 else "LOW",
+        "segment_id": seg.id, "segment": seg.name,
+        "area_id": near["area_id"], "area_label": near["area_label"],
+        "distance_m": dist_m,
+        "projected_peak_cm": round(peak, 1),
+        "rain_next_hour_mm": round(sum(nxt), 1),
+        "bowl": seg.bowl, "drain": seg.drain_id, "drain_health": 95,
+        "tide_lock": round(tide_lock(tide), 2),
+        "anchor": near["anchor"],
+    }
+
+
 def _minutes(step: int) -> int:
     return step * 15
 

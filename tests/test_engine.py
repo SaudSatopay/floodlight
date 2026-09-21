@@ -208,6 +208,24 @@ class TestRiskAt:
         street = r.risk_at(19.01482, 72.84538)
         assert street["covered"] is True and "probability" in street
 
+    def test_live_tap_covers_every_corridor_not_just_the_loaded_one(self):
+        # regression: with Hindmata loaded, a tap at Thane's own corridor
+        # used to answer "12.7 km from Dadar". Live risk must search ALL
+        # eight pilot areas.
+        from floodlight.engine.replay import (AREAS, live_risk_at,
+                                              nearest_street_all_areas)
+        ctx = {"past": [0.0] * 12, "next": [0.0] * 4, "tide": 2.0}
+        lat, lng = AREAS["thane"]["center"]
+        r = live_risk_at(lat, lng, ctx)
+        assert r["covered"] is True
+        assert r["area_id"] == "thane"
+        assert "probability" in r
+        # a tap in un-instrumented Kalwa names the honestly-nearest corridor
+        near = nearest_street_all_areas(19.19, 73.00)
+        assert near["area_id"] in ("thane", "mulund")
+        # and the open sea is still out of coverage
+        assert live_risk_at(18.95, 72.70, ctx)["covered"] is False
+
 
 class TestSkyOutlook:
     """The forecast verdict: a black-cloud afternoon must SAY so before the

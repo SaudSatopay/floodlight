@@ -27,7 +27,8 @@ from .engine.livefeed import (LiveMCGMFeed, fetch_open_meteo, fetch_open_meteo_g
                               fetch_open_meteo_region, live_mode_enabled, mumbai_grid,
                               summarize_outlook, wmo_label,
                               tide_estimate)
-from .engine.replay import AREAS, STORMS, StormReplay
+from .engine.replay import (AREAS, STORMS, StormReplay, live_risk_at,
+                            nearest_street_all_areas)
 from .engine.whatsapp import Outbox, guess_depth_cm, parse_messages, verify_token
 
 STATIC = Path(__file__).resolve().parent / "static"
@@ -304,6 +305,7 @@ def _area_probe(area_id: str) -> tuple[Segment, float]:
 
 
 _region_cache: dict = {"ts": 0.0, "payload": None}
+_region_met: dict = {}          # raw per-corridor rain rows — reused by tap-risk
 
 
 @app.get("/api/region")
@@ -329,6 +331,9 @@ async def region() -> JSONResponse:
     tide = tide_estimate()
     rows = []
     for aid, m in zip(ids, met):
+        if not degraded:
+            _region_met[aid] = {"past": m["past"], "now": m["now"],
+                                "next": list(m.get("next", []))}
         seg, cap = _area_probe(aid)
         depth = 0.0
         for mm in m["past"] + [m["now"]] + list(m.get("next", []))[:4]:
@@ -376,6 +381,15 @@ async def risk(lat: float, lng: float, mode: str = "replay") -> JSONResponse:
                 met = {"past": [], "next": [], "tide_est": tide_estimate()}
         rain_ctx = {"past": met["past"], "next": met["next"], "tide": met["tide_est"]}
     result = hub.replay.risk_at(lat, lng, rain_ctx)
+    if mode == "live" and result.get("covered") is False:
+        # the loaded ward doesn't cover this tap — but one of the OTHER
+        # pilot corridors might. Score it there, with that corridor's own
+        # real rain when the region feed has it.
+        near = nearest_street_all_areas(lat, lng)
+        m2 = _region_met.get(near["area_id"])
+        ctx2 = ({"past": m2["past"] + [m2["now"]], "next": m2["next"],
+                 "tide": rain_ctx["tide"]} if m2 else rain_ctx)
+        result = live_risk_at(lat, lng, ctx2)
     result["mode"] = mode
     if mode == "live" and result.get("covered", True):
         cached = _live_cache["payload"]
