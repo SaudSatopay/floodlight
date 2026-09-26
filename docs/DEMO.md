@@ -42,9 +42,11 @@ three languages — and an engine that already works on any city on Earth."*
 
 ## If the venue Wi-Fi dies
 
-Everything except LIVE CITY / Storm Watch is offline-safe once the page is loaded — the replay,
-tour, quiet day and 2005 all run from the server process. Run `python run.py` on the laptop and
-use `localhost:8737` as the fallback URL (same everything, minus live tiles/satellite).
+**Double-click `run_demo.bat`** in the repo root (Windows) — it reuses its virtual environment,
+so after one run with internet it launches fully offline and opens `localhost:8737` itself.
+Fonts are self-hosted, so the design is pixel-identical offline; the replay, tour, quiet day
+and 2005 all run from the local process. Only map tiles, the satellite layer and live rain
+need internet, and they degrade gracefully. (macOS/Linux: `python run.py`.)
 
 ## Timing note for 10:00 IST
 
