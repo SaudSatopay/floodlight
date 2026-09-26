@@ -136,6 +136,10 @@ small { font-size: 0.68em; color: var(--sub); font-weight: 400; }
 #legend-toggle { left: 12px; bottom: 12px; }
 #heat-toggle { left: 104px; bottom: 12px; }
 #cloud-toggle { left: 254px; bottom: 12px; }
+#earth-pill { left: 404px; bottom: 12px; color: var(--gold-2); border-color: var(--gold-3); }
+#earth-pill:hover { color: var(--gold-ink); background: var(--gold); }
+#stormwatch.flash { animation: swFlash 2.2s ease; }
+@keyframes swFlash { 0%, 60% { box-shadow: inset 3px 0 0 var(--gold); background: rgba(217, 169, 78, 0.05); } 100% { box-shadow: none; background: transparent; } }
 
 /* live cloud-cover veil: glows over the dark tiles, stays soft */
 .cloud-canvas { opacity: 0.5; mix-blend-mode: screen; filter: blur(5px); pointer-events: none; }
@@ -574,6 +578,7 @@ small { font-size: 0.68em; color: var(--sub); font-weight: 400; }
   .k-num { font-size: 20px; }
   .k-label { font-size: 6.4px; }
   #statusbar { flex: none; gap: 12px; font-size: 8px; }
+  #earth-pill { display: none; }
   #sb-window, #sb-outbox, #sb-sky, #statusbar .right { display: none; }
   .watch-row { flex-wrap: wrap; }
   .wr-met { flex: 1 1 100%; white-space: normal; padding-left: 56px; margin-top: 2px; }

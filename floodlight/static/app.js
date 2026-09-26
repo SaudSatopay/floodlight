@@ -508,7 +508,7 @@ function renderSummary() {
 
 function renderHints() {
   const s = state.snap;
-  if (state.mode === "live") { setHint("LIVE CITY: real rain + real satellite clouds. Zoom OUT to watch the whole system move in — the Clouds pill switches satellite/subtle/off."); return; }
+  if (state.mode === "live") { setHint("LIVE CITY: real rain + real satellite clouds. STORM WATCH · EARTH (below the corridor strip, or the gold pill on the map) flies anywhere on the planet it is raining right now."); return; }
   if (s.step < 0) setHint("Pick an AREA and a STORM — 26 July 2005 is in the library. Or open Live city for real weather.");
   else if (!s.finished && !state.mapHintDone) setHint("Watch the map change colour — then tap any street to see WHY it floods.");
   else if (!s.finished) setHint("Amber dashes = a blocked drain the engine diagnosed. Open Feed for the dispatch order.");
@@ -1292,6 +1292,7 @@ function enterLive() {
   heatPill();
   cloudPill();
   $("cloud-toggle").hidden = false;
+  $("earth-pill").hidden = false;
   if (state.live) { renderSky(); renderOutlook(); }   // instant paint from cache
   pollLive();
   pollRegion();
@@ -1317,6 +1318,7 @@ function exitLive() {
   $("sb-sky").hidden = true;
   heatPill();
   $("cloud-toggle").hidden = true;
+  $("earth-pill").hidden = true;
   updateClouds();
   clearWatchSel();
   for (const m of state.regionMarkers) map.removeLayer(m);
@@ -1664,6 +1666,11 @@ function cloudPill() {
   el.classList.toggle("on", state.cloudMode !== "off");
 }
 
+$("earth-pill").onclick = () => {
+  const sw = $("stormwatch");
+  sw.scrollIntoView({ behavior: "smooth", block: "start" });
+  sw.classList.remove("flash"); void sw.offsetWidth; sw.classList.add("flash");
+};
 $("cloud-toggle").onclick = () => {
   state.cloudMode = state.cloudMode === "sat" ? "subtle" : state.cloudMode === "subtle" ? "off" : "sat";
   cloudPill();
