@@ -82,6 +82,9 @@ a { color: inherit; text-decoration: none; }
   text-transform: uppercase; color: var(--cream-2);
 }
 .nav-links a:hover { color: var(--gold-2); }
+.nav-links a.here { color: var(--gold-2); }
+.nav-links a.here::after { content: ""; display: block; height: 2px; margin-top: 3px; background: var(--gold); }
+.nav-links a::after { content: ""; display: block; height: 2px; margin-top: 3px; background: transparent; }
 
 /* storm ticker — the cinema marquee under the nav */
 #ticker {
