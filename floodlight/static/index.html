@@ -14,7 +14,7 @@
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Anton&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&family=Space+Mono:ital,wght@0,400;0,700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css" />
   <link rel="stylesheet" href="/static/style.css" />
 </head>
@@ -230,8 +230,8 @@
 
       <div class="pane" id="pane-rain">
         <div class="panel-title" style="padding:0 16px">Storm profile · AWS cadence</div>
-        <canvas id="rain-chart" width="640" height="116"></canvas>
-        <p class="rain-note">Bars — rain per 15 minutes. Dashed line — the tide: when it rises past ~3 m the outfalls seal and the same rain floods much worse. That's Mumbai's multiplier.</p>
+        <canvas id="rain-chart" width="640" height="190"></canvas>
+        <p class="rain-note">Top lane — rain per 15-minute window (bright bar = the live window; outlined bars are still ahead). Bottom lane — the tide against the ~3 m outfall-seal line: past it, the same rain floods far worse. That's Mumbai's multiplier. Hover any window for the exact numbers.</p>
       </div>
     </section>
   </main>

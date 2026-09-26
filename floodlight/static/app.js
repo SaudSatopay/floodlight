@@ -59,12 +59,12 @@ window.addEventListener("load", () => { fixMapSize(); setTimeout(fixMapSize, 250
 setTimeout(fixMapSize, 60);
 
 const SEG_STYLES = {
-  ok:      { core: ["#3e4a52", 0.9, 3.0] },
-  watch:   { core: ["#e0a83c", 1.0, 4.5] },
-  alert:   { core: ["#e4574c", 1.0, 5.0] },
-  blocked: { core: ["#e0a83c", 1.0, 4.5], dash: "7 6", cls: "seg-blocked" },
+  ok:      { core: ["#3c4c6e", 0.9, 3.0] },
+  watch:   { core: ["#ffb43b", 1.0, 4.5] },
+  alert:   { core: ["#ff5546", 1.0, 5.0] },
+  blocked: { core: ["#ffb43b", 1.0, 4.5], dash: "7 6", cls: "seg-blocked" },
 };
-const CASING = { color: "#04060a", opacity: 0.85 };
+const CASING = { color: "#040711", opacity: 0.85 };
 
 function applySegStyle(id, row) {
   const trio = state.layers[id];
@@ -108,7 +108,7 @@ function focusSegment(id, pan = false) {
       .then((r) => r.json())
       .then((r) => {
         if (state.focusSeg !== id) return;
-        const col = r.tier === "HIGH" ? "#e4574c" : r.tier === "MODERATE" ? "#e0a83c" : "#4fc1d4";
+        const col = r.tier === "HIGH" ? "#ff5546" : r.tier === "MODERATE" ? "#ffb43b" : "#8fb4c4";
         $("engine-prob").hidden = false;
         $("engine-prob-val").textContent = `${Math.round(r.probability * 100)}% · ${r.tier}`;
         $("engine-prob-val").style.color = col;
@@ -142,12 +142,12 @@ function buildArea(meta) {
       lineCap: "round", lineJoin: "round", interactive: false,
     }).addTo(map);
     const core = L.polyline(latlngs, {
-      color: "#3e4a52", opacity: 0.9, weight: 3,
+      color: "#3c4c6e", opacity: 0.9, weight: 3,
       lineCap: "round", lineJoin: "round", className: "segcore",
       bubblingMouseEvents: false,
     }).addTo(map);
     const flow = L.polyline(latlngs, {
-      color: "#eafbff", opacity: 0, weight: 1.7, dashArray: "3 11",
+      color: "#dcf3fa", opacity: 0, weight: 1.7, dashArray: "3 11",
       lineCap: "round", lineJoin: "round", className: "flowline", interactive: false,
     }).addTo(map);
     state.layers[id] = { under, core, flow };
@@ -155,18 +155,18 @@ function buildArea(meta) {
   }
   for (const d of meta.drains) {
     state.drainMarkers[d.id] = L.circleMarker([d.lat, d.lng], {
-      radius: 3.5, color: "#5c666b", fillColor: "#0b0d0f", fillOpacity: 1, weight: 1.5,
+      radius: 3.5, color: "#41527a", fillColor: "#070b16", fillOpacity: 1, weight: 1.5,
       bubblingMouseEvents: false,
     }).addTo(map)
       .bindTooltip(`${d.id} · ${d.name}`, { direction: "top" })
       .bindPopup(() => {
         const live = state.snap && state.snap.drains.find((x) => x.id === d.id);
         const health = live ? live.health : 95;
-        const col = health < 40 ? "#e4574c" : health < 60 ? "#e0a83c" : "#4fc1d4";
+        const col = health < 40 ? "#ff5546" : health < 60 ? "#ffb43b" : "#8fb4c4";
         return `<div class="pop-name">${d.id} · ${d.name}</div>
           <div class="pop-row">design capacity <b>${d.capacity_mm} mm / 15 min</b></div>
           <div class="pop-row">health belief <b style="color:${col}">${health}%</b>
-          ${live && live.dispatched ? " · <b style=\"color:#e0a83c\">CREW DISPATCHED</b>" : ""}</div>
+          ${live && live.dispatched ? " · <b style=\"color:#ffb43b\">CREW DISPATCHED</b>" : ""}</div>
           <div class="pop-row">${health < 60 ? "surprising water upstream — likely choked" : "behaving as designed"}</div>`;
       });
   }
@@ -174,7 +174,7 @@ function buildArea(meta) {
   if (sf) {
     const mid = sf.geometry.coordinates[Math.floor(sf.geometry.coordinates.length / 2)];
     state.sensorMarker = L.circleMarker([mid[1], mid[0]], {
-      radius: 4.5, color: "#4fc1d4", fillColor: "#4fc1d4", fillOpacity: 0.8, weight: 1.5,
+      radius: 4.5, color: "#d9a94e", fillColor: "#d9a94e", fillOpacity: 0.8, weight: 1.5,
       className: "sensor-dot", bubblingMouseEvents: false,
     }).addTo(map)
       .bindTooltip("water-level sensor", { direction: "top" })
@@ -270,8 +270,8 @@ function drawClouds(ctx, W, H) {
   const k = fx.cloud / 100;
   // a soft ceiling — the whole frame dims a touch under heavy cloud
   const dim = ctx.createLinearGradient(0, 0, 0, H * 0.55);
-  dim.addColorStop(0, `rgba(7, 10, 13, ${0.34 * k})`);
-  dim.addColorStop(1, "rgba(7, 10, 13, 0)");
+  dim.addColorStop(0, `rgba(4, 7, 17, ${0.36 * k})`);
+  dim.addColorStop(1, "rgba(4, 7, 17, 0)");
   ctx.fillStyle = dim;
   ctx.fillRect(0, 0, W, H * 0.55);
   // drifting cloud bellies along the top edge
@@ -280,9 +280,9 @@ function drawClouds(ctx, W, H) {
     if (b.x * W - b.r * W > W) b.x = -b.r;
     const cx = b.x * W, cy = b.y * H, cr = b.r * W;
     const g = ctx.createRadialGradient(cx, cy, cr * 0.15, cx, cy, cr);
-    g.addColorStop(0, `rgba(30, 38, 45, ${0.30 * k * b.o})`);
-    g.addColorStop(0.7, `rgba(22, 28, 34, ${0.16 * k * b.o})`);
-    g.addColorStop(1, "rgba(22, 28, 34, 0)");
+    g.addColorStop(0, `rgba(26, 35, 56, ${0.30 * k * b.o})`);
+    g.addColorStop(0.7, `rgba(18, 25, 42, ${0.16 * k * b.o})`);
+    g.addColorStop(1, "rgba(18, 25, 42, 0)");
     ctx.fillStyle = g;
     ctx.beginPath(); ctx.arc(cx, cy, cr, 0, 2 * Math.PI); ctx.fill();
   }
@@ -384,7 +384,7 @@ function fxLoop() {
   // lightning during cloudburst windows
   if (fx.intensity >= 26 && Math.random() < 0.004) fx.flash = 0.5 + Math.random() * 0.3;
   if (fx.flash > 0.01) {
-    ctx.fillStyle = `rgba(222, 238, 248, ${fx.flash * 0.55})`;
+    ctx.fillStyle = `rgba(244, 236, 221, ${fx.flash * 0.5})`;
     ctx.fillRect(0, 0, c.width, c.height);
     fx.flash *= Math.random() < 0.12 ? 1.6 : 0.8;      // occasional double-strike
     if (fx.flash > 0.9) fx.flash = 0.9;
@@ -419,17 +419,28 @@ function renderTop() {
   $("storm-name").textContent = `${s.area_label} · ${s.storm_name}`;
   $("sb-outbox").textContent = `WA OUTBOX · ${s.outbox.mode.toUpperCase()} · ${s.outbox.sent}`;
 
-  const setKpi = (id, html) => {
+  // odometer roll — the numbers physically climb as the ward reacts
+  const rollKpi = (id, target, render) => {
     const el = $(id);
-    if (el.innerHTML !== html) {
-      el.innerHTML = html;
-      el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop");
-    }
+    const from = Number(el.dataset.v || 0);
+    if (from === target) return;
+    el.dataset.v = target;
+    const t0 = performance.now();
+    const dur = Math.min(700, 250 + Math.abs(target - from) * 10);
+    const ease = (k) => 1 - Math.pow(1 - k, 3);
+    cancelAnimationFrame(el._roll);
+    const step = (ts) => {
+      const k = Math.min(1, (ts - t0) / dur);
+      el.innerHTML = render(Math.round(from + (target - from) * ease(k)));
+      if (k < 1) el._roll = requestAnimationFrame(step);
+    };
+    el._roll = requestAnimationFrame(step);
+    el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop");
   };
-  setKpi("k-alerts", String(s.kpis.alerts_sent));
-  setKpi("k-people", s.kpis.people_warned.toLocaleString("en-IN"));
-  setKpi("k-lead", `${s.kpis.avg_lead_min}<small> min</small>`);
-  setKpi("k-drains", String(s.kpis.drains_flagged));
+  rollKpi("k-alerts", s.kpis.alerts_sent, String);
+  rollKpi("k-people", s.kpis.people_warned, (n) => n.toLocaleString("en-IN"));
+  rollKpi("k-lead", s.kpis.avg_lead_min, (n) => `${n}<small> min</small>`);
+  rollKpi("k-drains", s.kpis.drains_flagged, String);
 
   const badge = $("node-badge");
   badge.textContent = s.node_live ? "LIVE HARDWARE" : "SIMULATED";
@@ -505,7 +516,7 @@ function updateHeat() {
   if (!state.heatLayer) {
     state.heatLayer = L.heatLayer([], {
       radius: 34, blur: 26, maxZoom: 17, max: 1.0,
-      gradient: { 0.15: "#12333c", 0.4: "#2e6e7e", 0.6: "#4fc1d4", 0.8: "#e0a83c", 1.0: "#e4574c" },
+      gradient: { 0.15: "#16233f", 0.4: "#2e5570", 0.6: "#7fb4c9", 0.8: "#f0b84c", 1.0: "#ff5546" },
     }).addTo(map);
   }
   if (!state.heatOn) { state.heatLayer.setLatLngs([]); return; }
@@ -609,7 +620,7 @@ function updateClouds() {
   if (!state.cloudLayer) {
     state.cloudLayer = L.heatLayer([], {
       radius: 90, blur: 70, maxZoom: 12, max: 1.0,
-      gradient: { 0.1: "#232d36", 0.45: "#54646f", 0.75: "#93a5b0", 1.0: "#dfe8ee" },
+      gradient: { 0.1: "#1b2740", 0.45: "#4a5b78", 0.75: "#93a5b8", 1.0: "#e8eef4" },
     }).addTo(map);
     if (state.cloudLayer._canvas) state.cloudLayer._canvas.classList.add("cloud-canvas");
     // rain heat must stay ABOVE the cloud veil — re-append its canvas last
@@ -640,7 +651,7 @@ function riskPopupHtml(r) {
         for water.</div>
     </div>`;
   }
-  const col = r.tier === "HIGH" ? "#e4574c" : r.tier === "MODERATE" ? "#e0a83c" : "#4fc1d4";
+  const col = r.tier === "HIGH" ? "#ff5546" : r.tier === "MODERATE" ? "#ffb43b" : "#8fb4c4";
   const pct = Math.round(r.probability * 100);
   const bar = (label, frac, val) => `
     <div class="rp-driver"><span>${label}</span>
@@ -683,8 +694,8 @@ async function riskAt(latlng) {
     r = await (await fetch(`/api/risk?lat=${latlng.lat.toFixed(6)}&lng=${latlng.lng.toFixed(6)}&mode=${state.mode}`)).json();
   } catch { return; }
   if (state.riskPin) map.removeLayer(state.riskPin);
-  const col = r.covered === false ? "#5c666b"
-    : r.tier === "HIGH" ? "#e4574c" : r.tier === "MODERATE" ? "#e0a83c" : "#4fc1d4";
+  const col = r.covered === false ? "#6b7a99"
+    : r.tier === "HIGH" ? "#ff5546" : r.tier === "MODERATE" ? "#ffb43b" : "#8fb4c4";
   state.riskPin = L.circleMarker(latlng, {
     radius: 6, color: col, fillColor: col, fillOpacity: 0.35, weight: 2,
     bubblingMouseEvents: false,
@@ -703,8 +714,8 @@ function renderMap() {
       if (!m) continue;
       const hot = d.dispatched || d.health < 60;
       m.setStyle({
-        color: hot ? "#e0a83c" : "#5c666b",
-        fillColor: hot ? "#1c1508" : "#0b0d0f",
+        color: hot ? "#ffb43b" : "#41527a",
+        fillColor: hot ? "#1a1408" : "#070b16",
         weight: hot ? 2 : 1.5,
         radius: hot ? 5 : 3.5,
       });
@@ -745,41 +756,182 @@ function renderEngineCard() {
   }
 }
 
-function renderChart() {
+/* Storm-profile chart — two stacked lanes on a shared clock (never a
+   dual axis): RAIN bars, single ice hue with certainty encoded (past
+   solid, current bright, future outlined), and the TIDE lane with the
+   ~3 m outfall-seal threshold drawn and the locked stretch tinted. */
+
+const CH = {
+  bar: "#3e6e8c", barNow: "#a8d8e8", barFuture: "#17273f", barFutureLine: "#2b4a66",
+  tide: "#c9c1ad", lock: "#ffb43b", grid: "#1c2a47", label: "#837f6e",
+  value: "#f4ecdd", hover: "#f4ecdd",
+};
+
+function barTop(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, [r, r, 0, 0]);
+  else ctx.rect(x, y, w, h);
+}
+
+const chartTip = {
+  el: null,
+  show(host, cx, html) {
+    if (!this.el) {
+      this.el = document.createElement("div");
+      this.el.className = "chart-tip";
+      document.body.appendChild(this.el);
+    }
+    const r = host.getBoundingClientRect();
+    this.el.innerHTML = html;
+    this.el.hidden = false;
+    const w = this.el.offsetWidth;
+    this.el.style.left = `${Math.min(Math.max(r.left + cx - w / 2, 8), innerWidth - w - 8)}px`;
+    this.el.style.top = `${r.top - this.el.offsetHeight - 8}px`;
+  },
+  hide() { if (this.el) this.el.hidden = true; },
+};
+
+function clockAt(s, i) {
+  const start = (state.meta ? state.meta.storm.start_clock : "14:00").split(":").map(Number);
+  const min = start[0] * 60 + start[1] + i * 15;
+  return `${Math.floor(min / 60) % 24}:${String(min % 60).padStart(2, "0")}`;
+}
+
+function renderChart(hoverIdx = null) {
   const s = state.snap;
   if (!s) return;
   const cv = $("rain-chart");
   if (!cv.clientWidth) return;
   const ctx = cv.getContext("2d");
   const W = (cv.width = cv.clientWidth * 2);
-  const H = (cv.height = 260);
+  const H = (cv.height = 430);
   ctx.clearRect(0, 0, W, H);
   const n = s.rain_full.length;
-  const bw = W / n;
-  const maxRain = Math.max(...s.rain_full, 1);
+  const padL = 10, padR = 10;
+  const bw = (W - padL - padR) / n;
+  const top = 26, rainH = 188, laneGap = 46, tideH = 108;
+  const tideTop = top + rainH + laneGap;
+  const niceMax = Math.max(10, Math.ceil(Math.max(...s.rain_full, 1) / 10) * 10);
+  const peakIdx = s.rain_full.indexOf(Math.max(...s.rain_full));
 
-  s.rain_full.forEach((mm, i) => {
-    const h = Math.max(3, (mm / maxRain) * (H - 66));
-    const past = i <= s.step;
-    ctx.fillStyle = past ? (i === s.step ? "#4fc1d4" : "#2e6e7e") : "#161b1e";
-    ctx.fillRect(i * bw + 7, H - 34 - h, bw - 14, h);
-    ctx.fillStyle = past ? "#9aa3a7" : "#3d4549";
-    ctx.font = "500 18px IBM Plex Mono, monospace";
-    ctx.textAlign = "center";
-    ctx.fillText(String(mm), i * bw + bw / 2, H - 12);
-  });
+  ctx.font = '700 15px "Space Mono", monospace';
+  ctx.textAlign = "left";
+  ctx.fillStyle = CH.label;
+  ctx.fillText("RAIN · MM / 15 MIN", padL, 16);
+  ctx.fillText("TIDE · M", padL, tideTop - 12);
 
-  ctx.strokeStyle = "#e0a83c";
-  ctx.lineWidth = 2;
-  ctx.setLineDash([7, 6]);
-  ctx.beginPath();
-  (s.tide_full || []).slice(0, n).forEach((t, i) => {
-    const y = H - 40 - ((t - 1.5) / 3.5) * (H - 80);
-    const x = i * bw + bw / 2;
-    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-  });
-  ctx.stroke();
+  // recessive grid: baseline + faint mid rule
+  ctx.strokeStyle = CH.grid; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(padL, top + rainH + 0.5); ctx.lineTo(W - padR, top + rainH + 0.5); ctx.stroke();
+  ctx.setLineDash([2, 6]);
+  ctx.beginPath(); ctx.moveTo(padL, top + rainH / 2 + 0.5); ctx.lineTo(W - padR, top + rainH / 2 + 0.5); ctx.stroke();
   ctx.setLineDash([]);
+
+  // rain bars — one hue, certainty encoded
+  s.rain_full.forEach((mm, i) => {
+    const h = Math.max(4, (mm / niceMax) * rainH);
+    const x = padL + i * bw + 5, w = Math.max(6, bw - 10);
+    const y = top + rainH - h;
+    if (i > s.step) {                       // future: outlined, barely inked
+      ctx.fillStyle = CH.barFuture;
+      barTop(ctx, x, y, w, h, 4); ctx.fill();
+      ctx.strokeStyle = CH.barFutureLine; ctx.lineWidth = 1.5;
+      barTop(ctx, x, y, w, h, 4); ctx.stroke();
+    } else {
+      ctx.fillStyle = i === s.step ? CH.barNow : CH.bar;
+      barTop(ctx, x, y, w, h, 4); ctx.fill();
+    }
+    if (i === hoverIdx) {
+      ctx.strokeStyle = CH.hover; ctx.lineWidth = 2;
+      barTop(ctx, x - 2, y - 2, w + 4, h + 2, 5); ctx.stroke();
+    }
+  });
+  // selective labels: the peak and the live window only
+  ctx.font = '700 17px "Space Mono", monospace';
+  ctx.textAlign = "center";
+  const label = (i, col) => {
+    const mm = s.rain_full[i];
+    const y = top + rainH - Math.max(4, (mm / niceMax) * rainH) - 8;
+    ctx.fillStyle = col;
+    ctx.fillText(String(mm), padL + i * bw + bw / 2, y);
+  };
+  if (peakIdx <= s.step || true) label(peakIdx, CH.value);
+  if (s.step >= 0 && s.step !== peakIdx) label(s.step, CH.barNow);
+
+  // tide lane — the ~3 m seal threshold, locked stretch tinted
+  const tMin = 1.2, tMax = 4.9;
+  const ty = (v) => tideTop + tideH - ((v - tMin) / (tMax - tMin)) * tideH;
+  const tide = (s.tide_full || []).slice(0, n);
+  const tx = (i) => padL + i * bw + bw / 2;
+  const yLock = ty(3.0);
+  // locked area first (under the curve, above the threshold)
+  ctx.beginPath();
+  let inLock = false;
+  tide.forEach((v, i) => {
+    const x = tx(i), y = Math.min(ty(v), yLock);
+    if (!inLock) { ctx.moveTo(x, yLock); inLock = true; }
+    ctx.lineTo(x, y);
+  });
+  if (inLock) {
+    ctx.lineTo(tx(n - 1), yLock); ctx.closePath();
+    ctx.fillStyle = "rgba(255, 180, 59, 0.16)";
+    ctx.fill();
+  }
+  // threshold rule
+  ctx.strokeStyle = CH.lock; ctx.lineWidth = 1.5; ctx.setLineDash([6, 5]);
+  ctx.beginPath(); ctx.moveTo(padL, yLock + 0.5); ctx.lineTo(W - padR, yLock + 0.5); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.font = '700 14px "Space Mono", monospace';
+  ctx.textAlign = "right";
+  ctx.fillStyle = CH.lock;
+  ctx.fillText("OUTFALLS SEAL ~3 M", W - padR, yLock - 7);
+  // the tide line itself
+  ctx.strokeStyle = CH.tide; ctx.lineWidth = 2.5;
+  ctx.lineJoin = ctx.lineCap = "round";
+  ctx.beginPath();
+  tide.forEach((v, i) => (i === 0 ? ctx.moveTo(tx(i), ty(v)) : ctx.lineTo(tx(i), ty(v))));
+  ctx.stroke();
+
+  // shared clock axis
+  ctx.font = '400 15px "Space Mono", monospace';
+  ctx.textAlign = "center";
+  ctx.fillStyle = CH.label;
+  for (let i = 0; i < n; i++) {
+    const clock = clockAt(s, i);
+    if (clock.endsWith(":00")) ctx.fillText(clock, padL + i * bw + bw / 2, H - 8);
+  }
+
+  // live cursor through both lanes
+  if (s.step >= 0 && !s.finished) {
+    const x = padL + s.step * bw + bw / 2;
+    ctx.strokeStyle = "rgba(168, 216, 232, 0.4)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x, top - 6); ctx.lineTo(x, tideTop + tideH); ctx.stroke();
+  }
+  // hover crosshair
+  if (hoverIdx != null) {
+    const x = padL + hoverIdx * bw + bw / 2;
+    ctx.strokeStyle = "rgba(244, 236, 221, 0.35)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x, top - 6); ctx.lineTo(x, tideTop + tideH); ctx.stroke();
+  }
+}
+
+function bindRainHover() {
+  const cv = $("rain-chart");
+  if (cv.dataset.hover) return;
+  cv.dataset.hover = "1";
+  cv.addEventListener("mousemove", (e) => {
+    const s = state.snap;
+    if (!s) return;
+    const n = s.rain_full.length;
+    const rect = cv.getBoundingClientRect();
+    const frac = (e.clientX - rect.left) / rect.width;
+    const i = Math.max(0, Math.min(n - 1, Math.floor(frac * n)));
+    renderChart(i);
+    const tideV = (s.tide_full || [])[i];
+    chartTip.show(cv, (i + 0.5) * (rect.width / n),
+      `<b>${clockAt(s, i)}</b> · ${s.rain_full[i]} mm${tideV != null ? ` · tide ${tideV.toFixed(1)} m${tideV >= 3 ? " · SEALED" : ""}` : ""}${i > s.step ? " · ahead" : ""}`);
+  });
+  cv.addEventListener("mouseleave", () => { chartTip.hide(); renderChart(); });
 }
 
 /* ------------------------------------------------------ sky + outlook */
@@ -846,7 +998,7 @@ function renderSky() {
   }
 }
 
-const OL_COL = (mm) => (mm >= 5 ? "#e4574c" : mm >= 1.5 ? "#e0a83c" : "#4fc1d4");
+const OL_COL = (mm) => (mm >= 5 ? "#ff5546" : mm >= 1.5 ? "#ffb43b" : "#7fb4c9");
 
 function renderOutlook() {
   const l = state.live, strip = $("outlook-strip");
@@ -906,27 +1058,7 @@ async function pollLive() {
   renderOutlook();
   refreshSatClouds();
 
-  const cv = $("live-chart");
-  if (cv.clientWidth) {
-    const ctx = cv.getContext("2d");
-    const W = (cv.width = cv.clientWidth * 2), H = (cv.height = 220);
-    ctx.clearRect(0, 0, W, H);
-    const series = [...l.past, l.rain_now, ...l.next];
-    const nowIdx = l.past.length;
-    const bw = W / series.length;
-    const mx = Math.max(...series, 1);
-    series.forEach((mm, i) => {
-      const h = Math.max(2, (mm / mx) * (H - 50));
-      ctx.fillStyle = i === nowIdx ? "#4fc1d4" : i < nowIdx ? "#2e6e7e" : "#20444d";
-      ctx.fillRect(i * bw + 3, H - 26 - h, bw - 6, h);
-    });
-    ctx.fillStyle = "#5c666b";
-    ctx.font = "500 16px IBM Plex Mono, monospace";
-    ctx.textAlign = "center";
-    ctx.fillText("−3h", bw * 1.2, H - 8);
-    ctx.fillText("now", (nowIdx + 0.5) * bw, H - 8);
-    ctx.fillText("+2h", W - bw * 1.2, H - 8);
-  }
+  renderLiveChart();
 
   const list = $("live-risk-list");
   list.innerHTML = "";
@@ -944,7 +1076,70 @@ async function pollLive() {
   renderEngineCard();
 }
 
-const TIER_COL = { HIGH: "#e4574c", MODERATE: "#e0a83c", LOW: "#4fc1d4" };
+/* live-city mini chart — same single-hue language: real past solid,
+   the live window bright, the forecast outlined (not yet real) */
+function renderLiveChart(hoverIdx = null) {
+  const l = state.live;
+  const cv = $("live-chart");
+  if (!l || !cv || !cv.clientWidth) return;
+  const ctx = cv.getContext("2d");
+  const W = (cv.width = cv.clientWidth * 2), H = (cv.height = 220);
+  ctx.clearRect(0, 0, W, H);
+  const series = [...l.past, l.rain_now, ...l.next];
+  const nowIdx = l.past.length;
+  const bw = W / series.length;
+  const mx = Math.max(...series, 0.8);
+  ctx.strokeStyle = CH.grid; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, H - 26.5); ctx.lineTo(W, H - 26.5); ctx.stroke();
+  series.forEach((mm, i) => {
+    const h = Math.max(3, (mm / mx) * (H - 58));
+    const x = i * bw + 4, w = Math.max(4, bw - 8), y = H - 26 - h;
+    if (i > nowIdx) {
+      ctx.fillStyle = CH.barFuture;
+      barTop(ctx, x, y, w, h, 3); ctx.fill();
+      ctx.strokeStyle = CH.barFutureLine; ctx.lineWidth = 1.5;
+      barTop(ctx, x, y, w, h, 3); ctx.stroke();
+    } else {
+      ctx.fillStyle = i === nowIdx ? CH.barNow : CH.bar;
+      barTop(ctx, x, y, w, h, 3); ctx.fill();
+    }
+    if (i === hoverIdx) {
+      ctx.strokeStyle = CH.hover; ctx.lineWidth = 2;
+      barTop(ctx, x - 2, y - 2, w + 4, h + 2, 4); ctx.stroke();
+    }
+  });
+  ctx.fillStyle = CH.label;
+  ctx.font = '400 15px "Space Mono", monospace';
+  ctx.textAlign = "center";
+  ctx.fillText("−3H", bw * 1.4, H - 8);
+  ctx.fillStyle = CH.barNow;
+  ctx.fillText("NOW", (nowIdx + 0.5) * bw, H - 8);
+  ctx.fillStyle = CH.label;
+  ctx.fillText("+2H · FC", W - bw * 2, H - 8);
+}
+
+function bindLiveHover() {
+  const cv = $("live-chart");
+  if (cv.dataset.hover) return;
+  cv.dataset.hover = "1";
+  cv.addEventListener("mousemove", (e) => {
+    const l = state.live;
+    if (!l) return;
+    const series = [...l.past, l.rain_now, ...l.next];
+    const nowIdx = l.past.length;
+    const rect = cv.getBoundingClientRect();
+    const i = Math.max(0, Math.min(series.length - 1,
+      Math.floor(((e.clientX - rect.left) / rect.width) * series.length)));
+    renderLiveChart(i);
+    const rel = i === nowIdx ? "this 15-min window"
+      : i < nowIdx ? `${(nowIdx - i) * 15} min ago` : `+${(i - nowIdx) * 15} min · forecast`;
+    chartTip.show(cv, (i + 0.5) * (rect.width / series.length),
+      `<b>${series[i].toFixed(1)} mm</b> · ${rel}`);
+  });
+  cv.addEventListener("mouseleave", () => { chartTip.hide(); renderLiveChart(); });
+}
+
+const TIER_COL = { HIGH: "#ff5546", MODERATE: "#ffb43b", LOW: "#8fb4c4" };
 
 async function pollRegion() {
   try {
@@ -1433,6 +1628,8 @@ $("rep-send").onclick = async () => {
   fx.canvas = $("rain-fx");
   fx.ctx = fx.canvas.getContext("2d");
   requestAnimationFrame(fxLoop);
+  bindRainHover();
+  bindLiveHover();
   pollLive();                                  // warm the live cache early
   if (q.get("live") === "1") document.querySelector('[data-tab="live"]').click();
   else if (q.get("tour") === "1") startTour();
