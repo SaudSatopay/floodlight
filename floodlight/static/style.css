@@ -111,6 +111,10 @@ small { font-size: 0.68em; color: var(--sub); font-weight: 400; }
 #layout { display: flex; height: calc(100vh - 62px - 30px - 26px); }
 #map-wrap { flex: 1.5; position: relative; border-right: 1px solid var(--hair2); }
 #map { position: absolute; inset: 0; background: #050810; }
+#map-wrap::after {
+  content: ""; position: absolute; inset: 0; z-index: 650; pointer-events: none;
+  box-shadow: inset 0 0 120px 24px rgba(3, 5, 11, 0.55);
+}
 .dark-tiles { filter: invert(1) hue-rotate(196deg) brightness(0.52) contrast(1.06) saturate(0.34) sepia(0.14); }
 .leaflet-container { font: inherit; }
 
