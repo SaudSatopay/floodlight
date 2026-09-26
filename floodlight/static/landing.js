@@ -52,8 +52,8 @@ const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /* ------------------------------------------------------ hero ward sim */
 
-const COL = { ok: "#3e4a52", watch: "#e0a83c", alert: "#e4574c", blocked: "#e0a83c" };
-const CASING = "#04060a";
+const COL = { ok: "#3c4c6e", watch: "#ffb43b", alert: "#ff5546", blocked: "#ffb43b" };
+const CASING = "#040711";
 const BLOCKED_ID = "parel-tank-rd";
 const WINDOW_S = 2.35;      // real seconds per 15-min storm window
 const HOLD_S = 3.2;         // linger on the outcome
@@ -217,7 +217,7 @@ function drawFrame(fade) {
     if (fade > 0.25 && (s.state === "alert" || s.state === "blocked")) {
       path();
       ctx.globalAlpha = 0.75 * fade;
-      ctx.strokeStyle = "#eafbff";
+      ctx.strokeStyle = "#dcf3fa";
       ctx.lineWidth = 1.4;
       ctx.setLineDash([3, 11]);
       ctx.lineDashOffset = -(now / 26) % 28;
@@ -233,16 +233,16 @@ function drawFrame(fade) {
     const hot = d.id === "D-07" && blockedSeg && blockedSeg.flagged;
     ctx.beginPath();
     ctx.arc(d.xy[0], d.xy[1], hot ? 4.5 : 2.6, 0, Math.PI * 2);
-    ctx.fillStyle = "#0b0d0f";
+    ctx.fillStyle = "#070b16";
     ctx.fill();
     ctx.lineWidth = hot ? 2 : 1.2;
-    ctx.strokeStyle = hot ? COL.watch : "#454f55";
+    ctx.strokeStyle = hot ? COL.watch : "#41527a";
     ctx.stroke();
     if (hot) {
       const r = 7 + ((now / 900) % 1) * 16;
       ctx.beginPath();
       ctx.arc(d.xy[0], d.xy[1], r, 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(224, 168, 60, ${0.5 * (1 - ((now / 900) % 1)) * fade})`;
+      ctx.strokeStyle = `rgba(255, 180, 59, ${0.5 * (1 - ((now / 900) % 1)) * fade})`;
       ctx.lineWidth = 1.4;
       ctx.stroke();
     }
@@ -318,7 +318,7 @@ function heroLoop(ts) {
     sim.flashedAt = peakW; sim.flash = 0.5;
   }
   if (sim.flash > 0.01) {
-    sim.ctx.fillStyle = `rgba(222, 238, 248, ${sim.flash * 0.5})`;
+    sim.ctx.fillStyle = `rgba(244, 236, 221, ${sim.flash * 0.45})`;
     sim.ctx.fillRect(0, 0, sim.W, sim.H);
     sim.flash *= Math.random() < 0.14 ? 1.5 : 0.78;
     if (sim.flash > 0.85) sim.flash = 0.85;
