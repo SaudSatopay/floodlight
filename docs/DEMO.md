@@ -1,7 +1,9 @@
 # The 3-minute stage run — presenter runbook
 
-Open **floodlight.onrender.com ten minutes before** you're called (free tier cold-starts
-in ~1 min; after that it's instant). Keep one tab on `/` and one on `/app`.
+Open **floodlight.onrender.com/app?watch=1 ten minutes before** you're called: the free
+tier cold-starts in ~1 min, and the world scanner then builds full 32-city coverage within
+~4 minutes even when the shared host is rate-limited (it sweeps in chunks via the met.no
+fallback and keeps every good reading). Keep one tab on `/` and one on `/app`.
 
 ## Keys
 
