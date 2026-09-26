@@ -129,6 +129,26 @@ function drawBezel(ctx) {
     ctx.lineTo(b.cx + Math.cos(a) * b.r, b.cy + Math.sin(a) * b.r);
     ctx.stroke();
   }
+  // radar sweep — a slow brass beam patrolling the ward
+  if (!REDUCED && ctx.createConicGradient) {
+    const a = ((performance.now() / 14000) * 2 * Math.PI) % (2 * Math.PI);
+    ctx.save();
+    ctx.beginPath(); ctx.arc(b.cx, b.cy, b.r * 0.9 - 1, 0, 2 * Math.PI); ctx.clip();
+    const g = ctx.createConicGradient(a - 0.02, b.cx, b.cy);
+    g.addColorStop(0, "rgba(217, 169, 78, 0.11)");
+    g.addColorStop(0.14, "rgba(217, 169, 78, 0)");
+    g.addColorStop(1, "rgba(217, 169, 78, 0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(b.cx - b.r, b.cy - b.r, b.r * 2, b.r * 2);
+    ctx.strokeStyle = "rgba(240, 204, 126, 0.16)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(b.cx, b.cy);
+    ctx.lineTo(b.cx + Math.cos(a) * b.r * 0.9, b.cy + Math.sin(a) * b.r * 0.9);
+    ctx.stroke();
+    ctx.restore();
+  }
+
   // honest north: the tick leans exactly as far as the map was rotated
   ctx.strokeStyle = "rgba(217, 169, 78, 0.75)";
   ctx.lineWidth = 1.5;

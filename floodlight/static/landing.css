@@ -197,6 +197,8 @@ a { color: inherit; text-decoration: none; }
   border: 1px solid var(--line-2); border-radius: 0;
   padding: 10px 16px;
 }
+.hud-rec { width: 7px; height: 7px; border-radius: 50%; background: var(--red); animation: recPulse 1.6s ease-in-out infinite; }
+@keyframes recPulse { 50% { opacity: 0.25; box-shadow: 0 0 0 4px rgba(255, 85, 70, 0.12); } }
 #hud-clock { font-family: var(--serif); font-size: 19px; font-weight: 620; color: var(--cream); font-variant-numeric: tabular-nums; }
 .hud-sep { width: 1px; height: 20px; background: var(--line-2); }
 .hud-cell { font-family: var(--mono); font-size: 8.5px; letter-spacing: 0.16em; color: var(--cream-3); }
