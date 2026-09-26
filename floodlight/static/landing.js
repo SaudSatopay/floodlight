@@ -412,6 +412,7 @@ async function initHero() {
   } catch { return; }        // hero degrades to type-only — still a page
   sizeCanvas();
   buildSim(data);
+  if (data.storms_all) drawSparks(data.storms_all);
 
   let rsz;
   addEventListener("resize", () => {
@@ -517,6 +518,28 @@ async function hydrateEarth() {
   ).join(" · ") + ` · scanned ${w.cities.length} cities ${w.updated} IST`;
   strip.hidden = false;
   setTimeout(hydrateEarth, 600000);
+}
+
+/* storm library sparklines — each storm's real curve, in its row */
+function drawSparks(storms) {
+  // one shared scale — 2005 must TOWER and the quiet day must whisper
+  const gmax = Math.max(...storms.flatMap((st) => st.rain_mm), 1);
+  for (const st of storms) {
+    const row = document.querySelector(`.storm-row[href*="storm=${st.id}"]`);
+    if (!row || row.querySelector(".sr-spark")) continue;
+    const cv = document.createElement("canvas");
+    cv.className = "sr-spark";
+    cv.width = 200; cv.height = 44;
+    row.insertBefore(cv, row.querySelector(".sr-desc"));
+    const ctx = cv.getContext("2d");
+    const peak = st.rain_mm.indexOf(Math.max(...st.rain_mm));
+    const bw = 200 / st.rain_mm.length;
+    st.rain_mm.forEach((mm, i) => {
+      const h = Math.max(1.5, (mm / gmax) * 40);
+      ctx.fillStyle = i === peak ? "#ffb43b" : "#3e6e8c";
+      ctx.fillRect(i * bw + 2, 42 - h, bw - 4, h);
+    });
+  }
 }
 
 /* nav mirrors the section you are reading */
