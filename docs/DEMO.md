@@ -5,6 +5,12 @@ tier cold-starts in ~1 min, and the world scanner then builds full 32-city cover
 ~4 minutes even when the shared host is rate-limited (it sweeps in chunks via the met.no
 fallback and keeps every good reading). Keep one tab on `/` and one on `/app`.
 
+**One instrument, shared.** The deployed replay is a single live hub — everyone on the URL
+sees (and can drive) the same storm, which is a great line when the judges' phones and the
+projector move in lockstep. But if the room starts driving it mid-pitch, present from
+`run_demo.bat` instead (your own private hub on `localhost:8737`) and keep one cloud tab
+open just for Storm Watch.
+
 ## Keys
 
 | Key | Does |
