@@ -403,6 +403,7 @@ def stormwatch_assess(past: list[float], now: float, fc_hours: list[float],
 # --------------------------------------------------------------------------
 
 METNO_UA = {"User-Agent": "floodlight-hackathon-demo/0.7 (+https://github.com/SaudSatopay/floodlight)"}
+METNO_LAST_ERROR: str | None = None       # surfaced by /api/diag
 
 
 def _symbol_to_wmo(symbol: str) -> int:
@@ -470,6 +471,7 @@ def fetch_metno_many(points: list[tuple[float, float]]) -> list[dict]:
     each point gets a retry, stragglers come back marked dead, and only a
     mostly-dead sweep raises. Local clocks are unknown here → None."""
     import time as _t
+    global METNO_LAST_ERROR
     out, dead = [], 0
     for lat, lng in points:
         row = None
@@ -485,16 +487,18 @@ def fetch_metno_many(points: list[tuple[float, float]]) -> list[dict]:
                        "cloud": rows[0]["cloud"], "code": rows[0]["code"],
                        "utc_offset_s": None}
                 break
-            except Exception:
+            except Exception as e:
+                METNO_LAST_ERROR = f"{type(e).__name__}: {e}"[:200]
+                throttled = "429" in str(e) or "403" in str(e)
                 if attempt == 1:
-                    _t.sleep(0.4)
+                    _t.sleep(1.5 if throttled else 0.4)
         if row is None:
             dead += 1
             row = {"lat": lat, "lng": lng, "past": [0.0] * 12, "now": 0.0,
                    "next": [], "next6_mm": 0.0, "fc_hours": [],
                    "cloud": 0, "code": 0, "utc_offset_s": None, "dead": True}
         out.append(row)
-        _t.sleep(0.12)
+        _t.sleep(0.35)                     # stay far under met.no's burst limits
     if dead > len(points) * 0.6:
         raise RuntimeError(f"met.no mostly unreachable ({dead}/{len(points)})")
     return out

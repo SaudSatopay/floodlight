@@ -297,8 +297,25 @@ async def diag() -> JSONResponse:
             return {"ok": False, "ms": int((_time.time() - t0) * 1000),
                     "error": f"{type(e).__name__}: {e}"[:300]}
 
+    def probe_metno_sweep() -> dict:
+        from .engine import livefeed as lf
+        t0 = _time.time()
+        try:
+            rows = fetch_metno_many([(19.076, 72.877), (13.083, 80.270), (-6.208, 106.846)])
+            return {"ok": sum(1 for r in rows if not r.get("dead")),
+                    "dead": sum(1 for r in rows if r.get("dead")),
+                    "ms": int((_time.time() - t0) * 1000),
+                    "last_err": lf.METNO_LAST_ERROR}
+        except Exception as e:
+            return {"ok": 0, "ms": int((_time.time() - t0) * 1000),
+                    "error": f"{type(e).__name__}: {e}"[:200],
+                    "last_err": lf.METNO_LAST_ERROR}
+
     out = await loop.run_in_executor(None, probe)
     out["metno"] = await loop.run_in_executor(None, probe_metno)
+    out["metno_sweep3"] = await loop.run_in_executor(None, probe_metno_sweep)
+    from .engine import livefeed as _lf
+    out["metno_last_error"] = _lf.METNO_LAST_ERROR
     out["python"] = sys.version.split()[0]
     out["openssl"] = ssl.OPENSSL_VERSION
     out["platform"] = platform.platform()
