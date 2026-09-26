@@ -942,6 +942,17 @@ function bindRainHover() {
       `<b>${clockAt(s, i)}</b> · ${s.rain_full[i]} mm${tideV != null ? ` · tide ${tideV.toFixed(1)} m${tideV >= 3 ? " · SEALED" : ""}` : ""}${i > s.step ? " · ahead" : ""}`);
   });
   cv.addEventListener("mouseleave", () => { chartTip.hide(); renderChart(); });
+  // the chart is a scrubber: click a window, the replay jumps there
+  cv.style.cursor = "pointer";
+  cv.addEventListener("click", async (e) => {
+    const s = state.snap;
+    if (!s || state.mode === "live" || tour.on) return;
+    const rect = cv.getBoundingClientRect();
+    const i = Math.max(0, Math.min(s.rain_full.length - 1,
+      Math.floor(((e.clientX - rect.left) / rect.width) * s.rain_full.length)));
+    clearLocalRun();
+    await control({ action: "seek", step: i });
+  });
 }
 
 /* ------------------------------------------------------ sky + outlook */
@@ -1615,6 +1626,10 @@ document.addEventListener("keydown", (e) => {
   if (e.key === " ") { e.preventDefault(); $("btn-play").click(); }
   else if (e.key === "t" || e.key === "T") $("btn-tour").click();
   else if (e.key === "r" || e.key === "R") $("btn-reset").click();
+  else if (e.key === "e" || e.key === "E") {
+    if (state.mode !== "live") document.querySelector('[data-tab="live"]').click();
+    setTimeout(() => $("earth-pill").click(), state.mode === "live" ? 0 : 700);
+  }
 });
 $("storm-sel").onchange = async (e) => { clearLocalRun(); await control({ action: "load", storm: e.target.value }); };
 $("area-sel").onchange = async (e) => {
