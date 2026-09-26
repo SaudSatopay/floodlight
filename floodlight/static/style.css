@@ -49,7 +49,7 @@ small { font-size: 0.68em; color: var(--sub); font-weight: 400; }
 
 /* ------------------------------------------------------------ header */
 #topbar {
-  height: 58px;
+  height: 62px;
   display: flex;
   align-items: stretch;
   border-bottom: 1px solid var(--hair2);
@@ -61,21 +61,21 @@ small { font-size: 0.68em; color: var(--sub); font-weight: 400; }
 .brand .logo { font-family: var(--sans); font-stretch: 125%; font-weight: 800; font-size: 17px; letter-spacing: 0.07em; line-height: 1; color: var(--paper); }
 .brand .logo b { font-weight: 800; }
 .brand .logo i { font-style: normal; color: var(--gold); }
-.brand .tag { font-family: var(--mono); font-size: 7.5px; letter-spacing: 0.16em; color: var(--faint); margin-top: 4px; }
+.brand .tag { font-family: var(--mono); font-size: 7.5px; line-height: 1.2; letter-spacing: 0.16em; color: var(--faint); margin-top: 4px; }
 
 .clockbox { padding: 0 18px; border-right: 1px solid var(--hair); flex-direction: column; align-items: flex-start; justify-content: center; }
 .clock { font-family: var(--mono); font-weight: 700; font-variant-numeric: tabular-nums; font-size: 24px; line-height: 1; color: var(--paper); }
-.clock-sub { font-family: var(--mono); font-size: 7.5px; letter-spacing: 0.12em; color: var(--faint); margin-top: 4px; text-transform: uppercase; }
+.clock-sub { font-family: var(--mono); font-size: 7.5px; line-height: 1.2; letter-spacing: 0.12em; color: var(--faint); margin-top: 4px; text-transform: uppercase; }
 
 .gauges { gap: 0; }
 .gauge { width: auto; min-width: 104px; padding: 0 16px; border-right: 1px solid var(--hair); display: flex; flex-direction: column; justify-content: center; }
 .gauge .g-label { white-space: nowrap; }
-.g-label { font-family: var(--mono); font-size: 7.5px; letter-spacing: 0.12em; color: var(--faint); }
-.g-value { font-family: var(--mono); font-weight: 700; font-variant-numeric: tabular-nums; font-size: 18px; color: var(--paper); margin-top: 2px; }
+.g-label { font-family: var(--mono); font-size: 7.5px; line-height: 1.2; letter-spacing: 0.12em; color: var(--faint); }
+.g-value { font-family: var(--mono); font-weight: 700; font-variant-numeric: tabular-nums; font-size: 18px; line-height: 1.1; color: var(--paper); margin-top: 2px; }
 .g-value small { color: var(--faint); }
-.g-bar { height: 3px; background: var(--raise); margin-top: 5px; }
+.g-bar { height: 3px; background: var(--raise); margin-top: 4px; }
 #tide-lock-bar { height: 100%; width: 0%; background: var(--amber); transition: width 0.6s; }
-.g-label.state { margin-top: 3px; color: var(--sub); }
+.g-label.state { margin-top: 2px; color: var(--sub); }
 
 .controls { margin-left: auto; padding: 0 14px; gap: 8px; }
 .ctl {
@@ -108,7 +108,7 @@ small { font-size: 0.68em; color: var(--sub); font-weight: 400; }
 #hint-x:hover { color: var(--gold-2); }
 
 /* ------------------------------------------------------------ layout */
-#layout { display: flex; height: calc(100vh - 58px - 30px - 26px); }
+#layout { display: flex; height: calc(100vh - 62px - 30px - 26px); }
 #map-wrap { flex: 1.5; position: relative; border-right: 1px solid var(--hair2); }
 #map { position: absolute; inset: 0; background: #050810; }
 .dark-tiles { filter: invert(1) hue-rotate(196deg) brightness(0.52) contrast(1.06) saturate(0.34) sepia(0.14); }
