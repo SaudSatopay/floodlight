@@ -200,17 +200,26 @@ The app is a single uvicorn process with no database, so free tiers eat it happi
 
 ## Design language
 
-The dashboard is styled as a **hydrological instrument**, not a SaaS page — Bloomberg-terminal and
-mission-control DNA:
+**Marine Drive, midnight, monsoon.** The interface is styled as a serious hydrological
+instrument built from Mumbai's own materials — the city's Art Deco seafront, at night, in the rain —
+rather than the default dark-dashboard look:
 
-- graphite surfaces split by **hairline rules** — no decorated cards, no glows
-- **IBM Plex Sans + Plex Mono** with tabular numerals; Anton only for the wordmark
-- one working accent (**instrument teal**); **amber and vermillion appear only as status semantics**
-  (watch · alert · blocked · dispatched)
-- **cased cartographic strokes** on the map — dark casing under a solid colour fill, the way
-  professional GIS tools draw roads; the blocked drain marches amber dashes because that *is* signal
-- **progressive disclosure** — a plain-language status line and four numbers by default; the street
-  diagnosis, the raw feed, the gauge chart and the report composer all open on demand
+- **monsoon-midnight navy** surfaces split by hairline rules; **warm cream** ink, never cold gray
+- **brass/gold chrome** on everything interactive — Marine Drive is a UNESCO Art Deco ensemble,
+  so the glamour is native, not imported; deco shows up only in details (diamond bullets,
+  corner brackets, the cinema-marquee storm ticker)
+- **Fraunces** for the few earned editorial moments (the headline, the summary line, the tour's
+  title-card captions); **Archivo** for UI; **Space Mono** strictly for data
+- **status colours stay functional and hot** — signal amber (watch · blocked), coral vermillion
+  (alert), ice for water in motion — and are never reused as decoration
+- **cased cartographic strokes** on the navy-tinted map — dark casing under a solid colour fill,
+  the way professional GIS tools draw roads; the blocked drain marches amber dashes because that
+  *is* signal
+- **honest charts** — the storm profile is two stacked lanes on a shared clock (never a dual axis):
+  single-hue rain bars with the future outlined, and the tide against the drawn ~3 m outfall-seal
+  threshold
+- **progressive disclosure** — a plain-language serif status line and four numbers by default; the
+  street diagnosis, the raw feed, the storm profile and the report composer all open on demand
 
 ## Honest data notes
 
