@@ -281,6 +281,118 @@ def fetch_open_meteo_region(points: list[tuple[float, float]]) -> list[dict]:
     return out
 
 
+# --------------------------------------------------------------------------
+# STORM WATCH · EARTH — the credibility feature. The monsoon retreats from
+# Mumbai in late September, but it is always raining hard SOMEWHERE: the
+# scanner sweeps flood-famous cities across every longitude band and ranks
+# where the engine would be earning its keep right now. Same hydrology,
+# same honest labelling — a "typical dense street" estimate, not a mapped
+# corridor.
+# --------------------------------------------------------------------------
+
+WATCH_CITIES = [
+    # (id, city, country-code, lat, lng) — chosen for flood history AND
+    # longitude spread, so afternoon convection is always hitting some of them
+    ("mumbai", "Mumbai", "IN", 19.076, 72.877),
+    ("chennai", "Chennai", "IN", 13.083, 80.270),
+    ("kolkata", "Kolkata", "IN", 22.573, 88.364),
+    ("guwahati", "Guwahati", "IN", 26.144, 91.736),
+    ("dhaka", "Dhaka", "BD", 23.810, 90.412),
+    ("karachi", "Karachi", "PK", 24.861, 67.010),
+    ("colombo", "Colombo", "LK", 6.927, 79.861),
+    ("jakarta", "Jakarta", "ID", -6.208, 106.846),
+    ("manila", "Manila", "PH", 14.599, 120.984),
+    ("bangkok", "Bangkok", "TH", 13.756, 100.502),
+    ("ho-chi-minh", "Ho Chi Minh City", "VN", 10.823, 106.630),
+    ("hanoi", "Hanoi", "VN", 21.028, 105.804),
+    ("kuala-lumpur", "Kuala Lumpur", "MY", 3.139, 101.687),
+    ("singapore", "Singapore", "SG", 1.352, 103.820),
+    ("hong-kong", "Hong Kong", "HK", 22.319, 114.169),
+    ("shenzhen", "Shenzhen", "CN", 22.543, 114.058),
+    ("taipei", "Taipei", "TW", 25.033, 121.565),
+    ("tokyo", "Tokyo", "JP", 35.676, 139.650),
+    ("seoul", "Seoul", "KR", 37.566, 126.978),
+    ("lagos", "Lagos", "NG", 6.524, 3.379),
+    ("accra", "Accra", "GH", 5.603, -0.187),
+    ("nairobi", "Nairobi", "KE", -1.292, 36.822),
+    ("kinshasa", "Kinshasa", "CD", -4.441, 15.266),
+    ("miami", "Miami", "US", 25.762, -80.192),
+    ("houston", "Houston", "US", 29.760, -95.370),
+    ("new-orleans", "New Orleans", "US", 29.951, -90.072),
+    ("sao-paulo", "São Paulo", "BR", -23.551, -46.633),
+    ("rio", "Rio de Janeiro", "BR", -22.907, -43.173),
+    ("bogota", "Bogotá", "CO", 4.711, -74.072),
+    ("panama-city", "Panama City", "PA", 8.983, -79.520),
+    ("venice", "Venice", "IT", 45.440, 12.316),
+    ("valencia", "Valencia", "ES", 39.470, -0.377),
+]
+
+
+def fetch_open_meteo_watch(points: list[tuple[float, float]]) -> list[dict]:
+    """Like fetch_open_meteo_region, but timezone=auto so every row carries
+    its own utc_offset_seconds — the scanner shows each city's LOCAL clock
+    ("14:05 in Jakarta, pouring")."""
+    lats = ",".join(f"{p[0]:.4f}" for p in points)
+    lngs = ",".join(f"{p[1]:.4f}" for p in points)
+    url = ("https://api.open-meteo.com/v1/forecast"
+           f"?latitude={lats}&longitude={lngs}"
+           "&minutely_15=precipitation&past_minutely_15=12&forecast_minutely_15=5"
+           "&current=cloud_cover,weather_code&hourly=precipitation&forecast_hours=6"
+           "&timezone=auto")
+    req = urllib.request.Request(url, headers={"User-Agent": "floodlight/0.6"})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        data = json.load(r)
+    rows = data if isinstance(data, list) else [data]
+    out = []
+    for p, row in zip(points, rows):
+        vals = [float(v or 0) for v in row.get("minutely_15", {}).get("precipitation", [0] * 13)]
+        fc = [float(v or 0) for v in row.get("hourly", {}).get("precipitation", [])]
+        cur = row.get("current", {})
+        out.append({"lat": p[0], "lng": p[1],
+                    "past": vals[:12], "now": vals[12] if len(vals) > 12 else 0.0,
+                    "next": vals[13:], "next6_mm": round(sum(fc[:6]), 1),
+                    "fc_hours": fc[:6],
+                    "cloud": int(cur.get("cloud_cover", 0) or 0),
+                    "code": int(cur.get("weather_code", 0) or 0),
+                    "utc_offset_s": int(row.get("utc_offset_seconds", 0) or 0)})
+    return out
+
+
+def stormwatch_assess(past: list[float], now: float, fc_hours: list[float],
+                      next6_mm: float) -> dict:
+    """Pure scorer for one city (unit-tested, no network): the exact
+    hydrology on a typical dense street — bowl 1.25, 22 mm drain, tide
+    NEUTRAL because global tide tables aren't modelled (and we say so) —
+    giving an honest 'if this were a FLOODLIGHT corridor' probability now,
+    and projected through the next-6-h forecast."""
+    from .hydrology import Segment, step_depth_cm, waterlog_probability
+    seg = Segment(id="__watch__", name="typical dense street", bowl=1.25,
+                  drain_id="", subscribers=0)
+    # Flood-famous cities flood at cloudburst rates because EFFECTIVE
+    # drainage is nowhere near design capacity — silting, undersizing,
+    # backflow. 4.5 mm/15 min (~18 mm/h) is the honest 'typical' figure:
+    # steady 16 mm/h stays calm, a 40 mm/h downpour ponds, violent rain
+    # reads HIGH. Tide neutral — global tide tables aren't modelled.
+    cap, belief, tide = 4.5, 0.05, 2.0
+    depth = 0.0
+    for mm in list(past) + [now]:
+        depth = step_depth_cm(depth, mm, tide, seg, cap, belief)
+    p = waterlog_probability(depth)
+    # Project through the forecast tracking the CREST, with each hour's
+    # rain concentrated convectively (two wet windows, two dry) — tropical
+    # storm hours are bursts, not drizzle spread thin.
+    proj = peak = depth
+    for mm_h in fc_hours:
+        for mm in (mm_h / 2.0, mm_h / 2.0, 0.0, 0.0):
+            proj = step_depth_cm(proj, mm, tide, seg, cap, belief)
+            peak = max(peak, proj)
+    p2 = max(p, waterlog_probability(peak))
+    score = now * 3.0 + sum(past) + next6_mm * 0.7
+    tier = lambda x: "HIGH" if x >= 0.6 else "MODERATE" if x >= 0.3 else "LOW"
+    return {"risk_pct": round(p * 100), "risk_next_pct": round(p2 * 100),
+            "tier": tier(p), "tier_next": tier(p2), "score": round(score, 2)}
+
+
 # Real cloud imagery on the map comes straight from EUMETSAT's open WMS
 # (view.eumetsat.int, keyless): Meteosat-9 IODC sits over the Indian Ocean,
 # so its 10.8 µm infrared channel IS the live cloud picture over Mumbai,

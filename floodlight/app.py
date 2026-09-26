@@ -23,10 +23,11 @@ import time as _time
 
 from .engine.hydrology import step_depth_cm, waterlog_probability
 from .engine.hydrology import Segment
-from .engine.livefeed import (LiveMCGMFeed, fetch_open_meteo, fetch_open_meteo_grid,
-                              fetch_open_meteo_region, live_mode_enabled, mumbai_grid,
-                              summarize_outlook, wmo_label,
-                              tide_estimate)
+from .engine.livefeed import (WATCH_CITIES, LiveMCGMFeed, fetch_open_meteo,
+                              fetch_open_meteo_grid, fetch_open_meteo_region,
+                              fetch_open_meteo_watch, live_mode_enabled,
+                              mumbai_grid, stormwatch_assess, summarize_outlook,
+                              wmo_label, tide_estimate)
 from .engine.replay import (AREAS, COVERAGE_RADIUS_M, STORMS, StormReplay,
                             estimate_risk_at, live_risk_at,
                             nearest_street_all_areas)
@@ -407,6 +408,50 @@ async def region() -> JSONResponse:
     return JSONResponse(payload)
 
 
+_watch_cache: dict = {"ts": 0.0, "payload": None}
+
+
+@app.get("/api/stormwatch")
+async def stormwatch() -> JSONResponse:
+    """STORM WATCH · EARTH — scan flood-famous cities worldwide for who is
+    getting hit RIGHT NOW (or within 6 h), ranked. One batched Open-Meteo
+    call; the same hydrology scores a 'typical dense street' per city,
+    honestly labelled an area estimate. The demo's answer to a dry Mumbai
+    afternoon: it is always raining somewhere."""
+    import datetime as _dt
+    now = _time.time()
+    if _watch_cache["payload"] and now - _watch_cache["ts"] < 600:
+        return JSONResponse(_watch_cache["payload"])
+    loop = asyncio.get_running_loop()
+    try:
+        met = await loop.run_in_executor(
+            None, fetch_open_meteo_watch, [(c[3], c[4]) for c in WATCH_CITIES])
+    except Exception:
+        payload = {"updated": _time.strftime("%H:%M"), "degraded": True, "cities": []}
+        # brief negative cache so a blocked network doesn't hammer the API
+        _watch_cache.update(ts=now - 480, payload=payload)
+        return JSONResponse(payload)
+
+    utc = _dt.datetime.utcnow()
+    rows = []
+    for (cid, city, cc, lat, lng), m in zip(WATCH_CITIES, met):
+        a = stormwatch_assess(m["past"], m["now"], m["fc_hours"], m["next6_mm"])
+        local = utc + _dt.timedelta(seconds=m["utc_offset_s"])
+        rows.append({
+            "id": cid, "city": city, "cc": cc, "lat": lat, "lng": lng,
+            "rain_now": round(m["now"], 2), "past_3h": round(sum(m["past"]), 1),
+            "next6_mm": m["next6_mm"], "cloud": m["cloud"],
+            "sky": wmo_label(m["code"]), "local": local.strftime("%H:%M"),
+            **a,
+        })
+    rows.sort(key=lambda r: (r["risk_next_pct"], r["score"]), reverse=True)
+    payload = {"updated": _time.strftime("%H:%M"), "degraded": False,
+               "tide_note": "tide not modelled outside the MMR — scored neutral",
+               "cities": rows}
+    _watch_cache.update(ts=now, payload=payload)
+    return JSONResponse(payload)
+
+
 @app.get("/api/risk")
 async def risk(lat: float, lng: float, mode: str = "replay") -> JSONResponse:
     """Tap-anywhere waterlogging probability, with its drivers."""
@@ -441,10 +486,15 @@ async def risk(lat: float, lng: float, mode: str = "replay") -> JSONResponse:
             except Exception:
                 pm = None
             if pm and pm.get("elevation", 0) > 0.5:
+                # far from the MMR the Mumbai tide clock means nothing —
+                # score with a neutral tide and say so, never fake a lock
+                far = near["distance_m"] > 200_000
                 ctx3 = {"past": pm["past"] + [pm["now"]], "next": pm["next"],
-                        "tide": rain_ctx["tide"]}
+                        "tide": 2.0 if far else rain_ctx["tide"]}
                 result = estimate_risk_at(lat, lng, ctx3, near,
                                           elevation_m=pm["elevation"])
+                if far:
+                    result["tide_note"] = "unmodelled"
             else:
                 result = {"covered": False, "water": pm is not None, **near}
     result["mode"] = mode

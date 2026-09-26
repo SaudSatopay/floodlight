@@ -35,6 +35,12 @@ const state = {
   region: null,
   regionMarkers: [],
   regionTimer: null,
+  watch: null,                  // /api/stormwatch payload
+  watchTimer: null,
+  watchMarkers: [],
+  watchSel: null,               // selected world city id
+  watchRain: 0, watchCloud: 0,  // drive the FX while visiting a city
+  pendingWatch: null,           // ?watch=… deep link waiting for data
 };
 
 const $ = (id) => document.getElementById(id);
@@ -239,7 +245,7 @@ const fx = {
 
 function fxIntensity() {
   let mm = state.mode === "live"
-    ? (state.live ? state.live.rain_now * 4 : 0)
+    ? ((state.watchSel != null ? state.watchRain : (state.live ? state.live.rain_now : 0)) * 4)
     : (state.snap ? state.snap.rain_now : 0);
   if (Date.now() < fx.previewUntil) {
     const left = (fx.previewUntil - Date.now()) / 1000;
@@ -251,7 +257,8 @@ function fxIntensity() {
 function fxCloudTarget() {
   // in LIVE mode the deck is the REAL sky; in replay it thickens with rain
   let c = 0;
-  if (state.mode === "live" && state.live && state.live.sky) c = state.live.sky.cloud_now;
+  if (state.mode === "live" && state.watchSel != null) c = state.watchCloud;
+  else if (state.mode === "live" && state.live && state.live.sky) c = state.live.sky.cloud_now;
   else c = Math.min(85, fx.intensity * 2.4);
   if (Date.now() < fx.previewUntil) c = Math.max(c, 90);
   return c;
@@ -663,10 +670,12 @@ function riskPopupHtml(r) {
       <div class="rp-line"><span class="rp-big" style="color:${col}">${pct}%</span>
         <span class="rp-tier" style="color:${col};border-color:${col}">${r.tier}</span></div>
       <div class="rp-sub">no instrumented street here — scored from the real rain at
-        <b>this exact spot</b> + a typical Mumbai street profile${r.elevation_m != null ? ` · ground ~${r.elevation_m} m` : ""}</div>
+        <b>this exact spot</b> + a typical dense-city street profile${r.elevation_m != null ? ` · ground ~${r.elevation_m} m` : ""}</div>
       ${bar("projected peak", r.projected_peak_cm / 45, r.projected_peak_cm + " cm")}
       ${bar("rain next hour", r.rain_next_hour_mm / 60, r.rain_next_hour_mm + " mm")}
-      ${bar("tide lock", r.tide_lock, Math.round(r.tide_lock * 100) + "%")}
+      ${r.tide_note
+        ? `<div class="rp-sub">tide — not modelled outside the MMR · scored neutral</div>`
+        : bar("tide lock", r.tide_lock, Math.round(r.tide_lock * 100) + "%")}
       <div class="rp-sub">nearest instrumented street: <b>${r.nearest.segment}</b>
         (${r.nearest.area_label}) · ${fmtDist(r.nearest.distance_m)}</div>
       <div class="rp-note">computed from today's REAL rain · corridor-grade answers need a
@@ -1041,7 +1050,6 @@ async function pollLive() {
   if (state.mode !== "live") return;
   const l = state.live;
   $("live-rain").innerHTML = `${l.rain_now.toFixed(1)}<small> mm / 15 min</small>`;
-  $("live-area").textContent = l.area_label;
   const sum = l.outlook && l.outlook.summary;
   $("live-under").textContent = l.degraded
     ? "live feed unreachable — showing zero-rain baseline (DEGRADED)"
@@ -1158,10 +1166,11 @@ async function pollRegion() {
     div.innerHTML = `<span class="rr-risk" style="color:${TIER_COL[a.tier]}">${a.risk_pct}%</span>
       ${rising ? `<span class="rr-next" style="color:${TIER_COL[a.tier_next]}">▲${a.risk_next_pct}%</span>` : ""}
       <span class="rr-name">${a.label}</span>
-      <span class="rr-rain">${a.cloud != null ? `☁${a.cloud} · ` : ""}${a.rain_now.toFixed(1)} mm · 3h ${a.past_3h.toFixed(1)}${fc}</span>`;
+      <span class="rr-rain">${a.cloud != null ? `${a.cloud}% CLOUD · ` : ""}${a.rain_now.toFixed(1)} mm · 3h ${a.past_3h.toFixed(1)}${fc}</span>`;
     if (rising) div.title = `forecast: risk climbs to ${a.risk_next_pct}% within 6 h (${a.next6_mm} mm expected)`;
     div.onclick = async () => {
       clearLocalRun();
+      clearWatchSel();
       await control({ action: "load", area: a.id });
       await refreshMeta();
       pollLive();
@@ -1183,6 +1192,7 @@ async function pollRegion() {
       .bindTooltip(`${a.label} — ${a.risk_pct}%${(a.risk_next_pct || 0) - a.risk_pct >= 8 ? ` ▲${a.risk_next_pct}% by +6h` : ""} · ${a.rain_now.toFixed(1)} mm now${(a.next6_mm || 0) >= 0.5 ? ` · +${a.next6_mm} mm fc` : ""}`, { direction: "top" });
     m.on("click", async () => {
       clearLocalRun();
+      clearWatchSel();
       await control({ action: "load", area: a.id });
       await refreshMeta();
       pollLive();
@@ -1190,6 +1200,89 @@ async function pollRegion() {
     });
     state.regionMarkers.push(m);
   }
+}
+
+/* ------------------------------------------------ STORM WATCH · EARTH */
+/* The credibility feature: it is always raining somewhere. The scanner
+   ranks 32 flood-famous world cities by what the engine reads in their
+   REAL rain right now; tapping one flies the map there under the real
+   satellite clouds and answers with the honest area estimate. */
+
+function clearWatchSel() { state.watchSel = null; state.watchRain = 0; state.watchCloud = 0; }
+
+async function pollWatch() {
+  try {
+    state.watch = await (await fetch("/api/stormwatch")).json();
+  } catch { return; }
+  renderWatch();
+  if (state.pendingWatch && state.watch && !state.watch.degraded && state.watch.cities.length) {
+    const want = state.pendingWatch;
+    state.pendingWatch = null;
+    const c = state.watch.cities.find((x) => x.id === want) || state.watch.cities[0];
+    setTimeout(() => gotoWatchCity(c), 900);
+  }
+}
+
+function renderWatch() {
+  const list = $("watch-list");
+  if (!list || !state.watch) return;
+  const w = state.watch;
+  $("watch-upd").textContent = w.degraded ? "scanner unreachable — retrying"
+    : `updated ${w.updated} IST · open-meteo`;
+  if (w.degraded || !w.cities.length) {
+    list.innerHTML = `<div class="watch-wait">${w.degraded
+      ? "scanner unreachable from this network — retrying shortly" : "no data yet"}</div>`;
+    return;
+  }
+  list.innerHTML = "";
+  for (const c of w.cities.slice(0, 10)) {
+    const wet = c.rain_now >= 0.2 || c.tier_next !== "LOW";
+    const rising = c.risk_next_pct - c.risk_pct >= 8;
+    const div = document.createElement("div");
+    div.className = `watch-row${wet ? " wet" : ""}${state.watchSel === c.id ? " sel" : ""}`;
+    div.innerHTML = `
+      <span class="wr-risk" style="color:${TIER_COL[c.tier]}">${c.risk_pct}%</span>
+      ${rising ? `<span class="rr-next" style="color:${TIER_COL[c.tier_next]}">▲${c.risk_next_pct}%</span>` : ""}
+      <span class="wr-city">${c.city} <i>${c.cc}</i></span>
+      <span class="wr-met">${c.rain_now >= 0.2 ? `<b>${c.rain_now.toFixed(1)} MM NOW</b> · ` : ""}3H ${c.past_3h.toFixed(1)} · FC6 ${c.next6_mm.toFixed(1)} · ${c.local} LOCAL</span>`;
+    div.title = `${c.city}: ${c.sky} · fly there`;
+    div.onclick = () => gotoWatchCity(c);
+    list.appendChild(div);
+  }
+  renderWatchMarkers();
+}
+
+function renderWatchMarkers() {
+  for (const m of state.watchMarkers) map.removeLayer(m);
+  state.watchMarkers = [];
+  if (state.mode !== "live" || !state.watch || state.watch.degraded) return;
+  for (const c of state.watch.cities) {
+    if (c.rain_now < 0.5 && c.tier_next === "LOW") continue;      // only where weather is
+    const col = TIER_COL[c.tier_next];
+    const m = L.circleMarker([c.lat, c.lng], {
+      radius: 5.5, color: col, weight: 2, fillColor: col, fillOpacity: 0.3,
+      bubblingMouseEvents: false,
+    }).addTo(map)
+      .bindTooltip(`${c.city} — ${c.risk_pct}%${c.risk_next_pct - c.risk_pct >= 8 ? ` ▲${c.risk_next_pct}%` : ""} · ${c.rain_now.toFixed(1)} mm now · ${c.sky}`, { direction: "top" });
+    m.on("click", () => gotoWatchCity(c));
+    state.watchMarkers.push(m);
+  }
+}
+
+function gotoWatchCity(c) {
+  state.watchSel = c.id;
+  state.watchRain = c.rain_now;
+  state.watchCloud = c.cloud || 0;
+  renderWatch();
+  map.flyTo([c.lat, c.lng], 11, { duration: 2.4 });
+  const tone = c.tier_next === "HIGH" ? "red" : c.tier_next === "MODERATE" ? "amber" : "teal";
+  showLT(`STORM WATCH · ${c.city.toUpperCase()} ${c.cc} · ${c.local} LOCAL`,
+    `${c.rain_now >= 0.2 ? `${c.rain_now.toFixed(1)} mm/15 min falling right now` : `${c.sky[0].toUpperCase()}${c.sky.slice(1)}`} — the same hydrology, fed this city's real rain. ${
+      c.risk_next_pct >= c.risk_pct + 8 ? `${c.risk_pct}% now, ${c.risk_next_pct}% within six hours.` : `${c.risk_pct}% on a typical dense street.`}`,
+    tone, 9000);
+  // let the flight land, then answer at the exact centre — the honest
+  // AREA ESTIMATE popup, computed from the rain at that spot
+  setTimeout(() => { if (state.watchSel === c.id) riskAt(L.latLng(c.lat, c.lng)); }, 2600);
 }
 
 function enterLive() {
@@ -1201,11 +1294,13 @@ function enterLive() {
   if (state.live) { renderSky(); renderOutlook(); }   // instant paint from cache
   pollLive();
   pollRegion();
+  pollWatch();
   if (!state.liveTimer) state.liveTimer = setInterval(pollLive, 60000);
   if (!state.regionTimer) state.regionTimer = setInterval(pollRegion, 120000);
-  // pull back to the whole Mumbai Metropolitan Region — and allow zooming
-  // right out to the Konkan coast, where the satellite view tells its story
-  map.setMinZoom(7);
+  if (!state.watchTimer) state.watchTimer = setInterval(pollWatch, 600000);
+  // pull back as far as the whole PLANET — storm watch flies worldwide and
+  // the EUMETSAT mosaic is global, so the zoomed-out view is a live globe
+  map.setMinZoom(3);
   if (state.region && state.region.areas.length) {
     map.fitBounds(L.latLngBounds(state.region.areas.map((a) => a.center)).pad(0.18));
   } else {
@@ -1222,9 +1317,13 @@ function exitLive() {
   heatPill();
   $("cloud-toggle").hidden = true;
   updateClouds();
+  clearWatchSel();
   for (const m of state.regionMarkers) map.removeLayer(m);
   state.regionMarkers = [];
+  for (const m of state.watchMarkers) map.removeLayer(m);
+  state.watchMarkers = [];
   if (state.regionTimer) { clearInterval(state.regionTimer); state.regionTimer = null; }
+  if (state.watchTimer) { clearInterval(state.watchTimer); state.watchTimer = null; }
   map.setMinZoom(13);
   if (state.meta) map.setView(state.meta.area.center, state.meta.area.zoom);
   renderMap();
@@ -1499,6 +1598,7 @@ document.addEventListener("keydown", (e) => {
 $("storm-sel").onchange = async (e) => { clearLocalRun(); await control({ action: "load", storm: e.target.value }); };
 $("area-sel").onchange = async (e) => {
   clearLocalRun();
+  clearWatchSel();
   await control({ action: "load", area: e.target.value });
   await refreshMeta();
   if (state.mode === "live") pollLive();
@@ -1631,7 +1731,12 @@ $("rep-send").onclick = async () => {
   bindRainHover();
   bindLiveHover();
   pollLive();                                  // warm the live cache early
-  if (q.get("live") === "1") document.querySelector('[data-tab="live"]').click();
+  const watchQ = q.get("watch");
+  if (watchQ) {                                // ?watch=1 → wettest city on Earth
+    state.pendingWatch = watchQ === "1" ? "__top__" : watchQ;
+    document.querySelector('[data-tab="live"]').click();
+  }
+  else if (q.get("live") === "1") document.querySelector('[data-tab="live"]').click();
   else if (q.get("tour") === "1") startTour();
   else if (q.get("autoplay") === "1") {
     if (s.finished) { clearLocalRun(); await control({ action: "reset" }); }
