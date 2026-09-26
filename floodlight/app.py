@@ -23,7 +23,8 @@ import time as _time
 
 from .engine.hydrology import step_depth_cm, waterlog_probability
 from .engine.hydrology import Segment
-from .engine.livefeed import (WATCH_CITIES, LiveMCGMFeed, fetch_open_meteo,
+from .engine.livefeed import (WATCH_CITIES, LiveMCGMFeed, fetch_metno,
+                              fetch_metno_many, fetch_open_meteo,
                               fetch_open_meteo_grid, fetch_open_meteo_region,
                               fetch_open_meteo_watch, live_mode_enabled,
                               mumbai_grid, stormwatch_assess, summarize_outlook,
@@ -286,7 +287,18 @@ async def diag() -> JSONResponse:
             return {"ok": False, "ms": int((_time.time() - t0) * 1000),
                     "error": f"{type(e).__name__}: {e}"[:400]}
 
+    def probe_metno() -> dict:
+        t0 = _time.time()
+        try:
+            r = fetch_metno(19.076, 72.877)
+            return {"ok": True, "ms": int((_time.time() - t0) * 1000),
+                    "now": r["now"]}
+        except Exception as e:
+            return {"ok": False, "ms": int((_time.time() - t0) * 1000),
+                    "error": f"{type(e).__name__}: {e}"[:300]}
+
     out = await loop.run_in_executor(None, probe)
+    out["metno"] = await loop.run_in_executor(None, probe_metno)
     out["python"] = sys.version.split()[0]
     out["openssl"] = ssl.OPENSSL_VERSION
     out["platform"] = platform.platform()
@@ -301,7 +313,10 @@ def _point_met(lat: float, lng: float) -> dict:
     hit = _pt_met_cache.get(key)
     if hit and now - hit[0] < 600:
         return hit[1]
-    m = fetch_open_meteo(lat, lng)
+    try:
+        m = fetch_open_meteo(lat, lng)
+    except Exception:
+        m = fetch_metno(lat, lng)          # elevation None → land unknown
     _pt_met_cache[key] = (now, m)
     return m
 
@@ -317,14 +332,18 @@ async def live_city() -> JSONResponse:
             and _live_cache["payload"]["area_label"] == area["label"]):
         return JSONResponse(_live_cache["payload"])
     lat, lng = area["center"]
-    degraded, met = False, None
+    degraded, met, fallback = False, None, None
     loop = asyncio.get_running_loop()
     try:
         met = await loop.run_in_executor(None, fetch_open_meteo, lat, lng)
     except Exception:
-        degraded = True
-        met = {"past": [0.0] * 12, "now": 0.0, "next": [0.0] * 8, "time": "",
-               "cloud_now": 0, "code_now": 0, "hours": []}
+        try:
+            met = await loop.run_in_executor(None, fetch_metno, lat, lng)
+            fallback = "metno"
+        except Exception:
+            degraded = True
+            met = {"past": [0.0] * 12, "now": 0.0, "next": [0.0] * 8, "time": "",
+                   "cloud_now": 0, "code_now": 0, "hours": []}
 
     tide = tide_estimate()
     # Stateless shading: run the past 3 h through the expected model with
@@ -346,7 +365,10 @@ async def live_city() -> JSONResponse:
         pass
 
     payload = {
-        "updated": met["time"], "source": "open-meteo.com · 15-minutely",
+        "updated": met["time"],
+        "source": ("met.no · hourly forecast (fallback — no past rain)"
+                   if fallback else "open-meteo.com · 15-minutely"),
+        "fallback": fallback,
         "degraded": degraded,
         "rain_now": round(met["now"], 2),
         "past": [round(v, 2) for v in met["past"]],
@@ -408,13 +430,17 @@ async def region() -> JSONResponse:
     ids = list(AREAS.keys())
     centers = [tuple(AREAS[a]["center"]) for a in ids]
     loop = asyncio.get_running_loop()
-    degraded, met = False, None
+    degraded, met, fallback = False, None, None
     try:
         met = await loop.run_in_executor(None, fetch_open_meteo_region, centers)
     except Exception:
-        degraded = True
-        met = [{"past": [0.0] * 12, "now": 0.0, "next": [], "next6_mm": 0.0,
-                "fc_hours": []} for _ in ids]
+        try:
+            met = await loop.run_in_executor(None, fetch_metno_many, centers)
+            fallback = "metno"
+        except Exception:
+            degraded = True
+            met = [{"past": [0.0] * 12, "now": 0.0, "next": [], "next6_mm": 0.0,
+                    "fc_hours": []} for _ in ids]
 
     tide = tide_estimate()
     rows = []
@@ -446,7 +472,7 @@ async def region() -> JSONResponse:
             "tier_next": "HIGH" if p2 >= 0.6 else "MODERATE" if p2 >= 0.3 else "LOW",
         })
     payload = {"updated": _time.strftime("%H:%M"), "degraded": degraded,
-               "tide_est": tide, "areas": rows}
+               "src": fallback, "tide_est": tide, "areas": rows}
     if degraded:
         stale = _serve_stale(_region_last_good.get("mmr"), payload)
         _region_cache.update(ts=now - 60, payload=stale)
@@ -472,10 +498,17 @@ async def stormwatch() -> JSONResponse:
     if _watch_cache["payload"] and now - _watch_cache["ts"] < 600:
         return JSONResponse(_watch_cache["payload"])
     loop = asyncio.get_running_loop()
+    fallback = None
     try:
         met = await loop.run_in_executor(
             None, fetch_open_meteo_watch, [(c[3], c[4]) for c in WATCH_CITIES])
     except Exception:
+        try:
+            met = await loop.run_in_executor(
+                None, fetch_metno_many, [(c[3], c[4]) for c in WATCH_CITIES])
+            fallback = "metno"
+        except Exception:
+            met = None
         payload = {"updated": _time.strftime("%H:%M"), "degraded": True, "cities": []}
         stale = _serve_stale(_watch_last_good.get("earth"), payload)
         # brief negative cache so a blocked network doesn't hammer the API
@@ -485,17 +518,22 @@ async def stormwatch() -> JSONResponse:
     utc = _dt.datetime.utcnow()
     rows = []
     for (cid, city, cc, lat, lng), m in zip(WATCH_CITIES, met):
+        if m.get("dead"):
+            continue                      # one unreachable point ≠ no scan
         a = stormwatch_assess(m["past"], m["now"], m["fc_hours"], m["next6_mm"])
-        local = utc + _dt.timedelta(seconds=m["utc_offset_s"])
+        off = m.get("utc_offset_s")
+        local = None if off is None else utc + _dt.timedelta(seconds=off)
         rows.append({
             "id": cid, "city": city, "cc": cc, "lat": lat, "lng": lng,
             "rain_now": round(m["now"], 2), "past_3h": round(sum(m["past"]), 1),
             "next6_mm": m["next6_mm"], "cloud": m["cloud"],
-            "sky": wmo_label(m["code"]), "local": local.strftime("%H:%M"),
+            "sky": wmo_label(m["code"]),
+            "local": "—" if local is None else local.strftime("%H:%M"),
             **a,
         })
     rows.sort(key=lambda r: (r["risk_next_pct"], r["score"]), reverse=True)
     payload = {"updated": _time.strftime("%H:%M"), "degraded": False,
+               "src": fallback,
                "tide_note": "tide not modelled outside the MMR — scored neutral",
                "cities": rows}
     _watch_last_good["earth"] = (now, payload)
@@ -536,7 +574,7 @@ async def risk(lat: float, lng: float, mode: str = "replay") -> JSONResponse:
                 pm = await loop.run_in_executor(None, _point_met, lat, lng)
             except Exception:
                 pm = None
-            if pm and pm.get("elevation", 0) > 0.5:
+            if pm and (pm.get("elevation") is None or pm["elevation"] > 0.5):
                 # far from the MMR the Mumbai tide clock means nothing —
                 # score with a neutral tide and say so, never fake a lock
                 far = near["distance_m"] > 200_000
