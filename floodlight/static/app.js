@@ -1057,6 +1057,15 @@ function renderFeed() {
   const s = state.snap;
   if (!s) return;
   const feed = $("feed");
+  // a reset (ours, a deep link, another client) rewinds the storm clock —
+  // drop the dedupe set or the fresh run's identical ids render nothing
+  if (state.lastFeedStep !== undefined && s.step < state.lastFeedStep) {
+    state.renderedFeed.clear();
+    feed.innerHTML = "";
+    state.feedUnseen = 0;
+    $("feed-badge").hidden = true;
+  }
+  state.lastFeedStep = s.step;
   const items = [];
 
   for (const r of s.reports) {
@@ -1284,6 +1293,14 @@ function clearLocalRun() {
 $("btn-play").onclick = () => { if (tour.on) endTour(); control({ action: state.running ? "pause" : "start" }); };
 $("btn-tour").onclick = () => (tour.on ? endTour() : startTour());
 $("btn-reset").onclick = async () => { if (tour.on) endTour(); clearLocalRun(); await control({ action: "reset" }); };
+
+// stage shortcuts — hands stay off the trackpad mid-pitch
+document.addEventListener("keydown", (e) => {
+  if (e.target !== document.body || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.key === " ") { e.preventDefault(); $("btn-play").click(); }
+  else if (e.key === "t" || e.key === "T") $("btn-tour").click();
+  else if (e.key === "r" || e.key === "R") $("btn-reset").click();
+});
 $("storm-sel").onchange = async (e) => { clearLocalRun(); await control({ action: "load", storm: e.target.value }); };
 $("area-sel").onchange = async (e) => {
   clearLocalRun();
