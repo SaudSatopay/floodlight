@@ -56,6 +56,12 @@ Fonts are self-hosted, so the design is pixel-identical offline; the replay, tou
 and 2005 all run from the local process. Only map tiles, the satellite layer and live rain
 need internet, and they degrade gracefully. (macOS/Linux: `python run.py`.)
 
+## Pocket copy
+
+FLOODLIGHT installs as an app: open `floodlight.onrender.com/app` on your phone →
+browser menu → **Add to Home Screen**. It launches full-screen with its own icon — the
+hallway demo while judges walk between tables, and a second screen if the laptop misbehaves.
+
 ## Timing note for 10:00 IST
 
 At demo time it is mid-day across South-East Asia — peak convection over Jakarta, Manila,
