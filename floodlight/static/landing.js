@@ -522,11 +522,13 @@ async function hydrateEarth() {
     `<b>${c.city}</b> ${c.rain_now >= 0.2 ? `${c.rain_now.toFixed(1)} mm now` : `${c.risk_next_pct}% by +6 h`}`
   ).join(" · ") + ` · scanned ${w.cities.length} cities ${w.updated} IST`;
   strip.hidden = false;
-  // the hero CTA names the live city — the planet answers on the button itself
+  // the hero CTA names the live city — the planet answers on the button
+  // itself; a drying planet takes the badge back off (no stale readings)
   const t0 = top[0], cta = document.querySelector(".cta.ghost");
-  if (cta && t0 && t0.rain_now >= 0.2) {
-    cta.innerHTML = `Where is it flooding right now? →` +
-      ` <b class="cta-now">${t0.city} · ${t0.rain_now.toFixed(1)} mm</b>`;
+  if (cta && t0) {
+    cta.innerHTML = t0.rain_now >= 0.2
+      ? `Where is it flooding right now? → <b class="cta-now">${t0.city} · ${t0.rain_now.toFixed(1)} mm</b>`
+      : `Where is it flooding right now? →`;
   }
   setTimeout(hydrateEarth, 600000);
 }
