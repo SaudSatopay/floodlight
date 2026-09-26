@@ -69,7 +69,7 @@
 
   <main id="layout">
     <section id="map-wrap">
-      <div id="map"></div>
+      <div id="map" role="application" aria-label="Ward flood map — streets colour by risk as the storm runs"></div>
       <canvas id="rain-fx"></canvas>
 
       <button id="legend-toggle" class="overlay-pill">Map key</button>
@@ -100,7 +100,7 @@
         </div>
       </div>
 
-      <div id="lowerthird" class="teal" hidden>
+      <div id="lowerthird" class="teal" role="status" aria-live="polite" hidden>
         <div class="lt-kicker" id="lt-kicker">—</div>
         <div class="lt-main" id="lt-main">—</div>
       </div>
