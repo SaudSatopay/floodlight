@@ -180,10 +180,16 @@ async def landing_data() -> JSONResponse:
     whatever area/storm the live replay is currently holding."""
     if not _landing_cache:
         area_dir = DATA / "areas" / "hindmata"
+        storms_all = []
+        for sid, meta_s in STORMS.items():
+            sj = json.loads((DATA / meta_s["storm"]).read_text(encoding="utf-8"))
+            storms_all.append({"id": sid, "rain_mm": sj["rain_mm"],
+                               "total": round(sum(sj["rain_mm"]))})
         _landing_cache["payload"] = {
             "geojson": json.loads((area_dir / "segments.geojson").read_text(encoding="utf-8")),
             "drains": json.loads((area_dir / "drains.json").read_text(encoding="utf-8"))["drains"],
             "storm": json.loads((DATA / "storm_replay.json").read_text(encoding="utf-8")),
+            "storms_all": storms_all,
         }
     return JSONResponse(_landing_cache["payload"])
 
