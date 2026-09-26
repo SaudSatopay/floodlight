@@ -10,14 +10,16 @@
 <p align="center">
   <img alt="python" src="https://img.shields.io/badge/python-3.11+-4fc1d4?style=flat-square&labelColor=0b0d0f" />
   <img alt="fastapi" src="https://img.shields.io/badge/fastapi-SSE%20stream-e8eae6?style=flat-square&labelColor=0b0d0f" />
-  <img alt="tests" src="https://img.shields.io/badge/tests-20%20green-2bd576?style=flat-square&labelColor=0b0d0f" />
+  <img alt="tests" src="https://img.shields.io/badge/tests-31%20green-2bd576?style=flat-square&labelColor=0b0d0f" />
   <img alt="alerts" src="https://img.shields.io/badge/alerts-मर%20·%20हि%20·%20EN-e0a83c?style=flat-square&labelColor=0b0d0f" />
   <img alt="license" src="https://img.shields.io/badge/license-MIT-9aa3a7?style=flat-square&labelColor=0b0d0f" />
 </p>
 
 <p align="center">
   <b>▶ Live demo: <a href="https://floodlight.onrender.com">floodlight.onrender.com</a></b><br/>
-  <sub>free-tier host — a cold start can take up to a minute, then press ▶ Run storm</sub>
+  <sub>free-tier host — a cold start can take up to a minute. The pitch page opens first;
+  <a href="https://floodlight.onrender.com/app">/app</a> is the war room, and
+  <a href="https://floodlight.onrender.com/app?tour=1">/app?tour=1</a> runs the guided tour.</sub>
 </p>
 
 <p align="center">
@@ -72,8 +74,13 @@ prediction on its streets. The system learns the ward, storm by storm.
 ```bash
 pip install -r requirements.txt
 python run.py
-# open http://localhost:8737 and press ▶ Run storm
+# open http://localhost:8737 — the landing page — and step into the war room,
+# or go straight to http://localhost:8737/app and press ▶ Run storm.
+# Pressed for time? /app?tour=1 replays the storm with cinematic captions.
 ```
+
+Deep links the landing page uses (and you can too): `/app?storm=monsoon-2005&autoplay=1`,
+`/app?area=kurla&live=1`, `/app?tour=1` — any pairing, one click deep.
 
 **Eight flood-famous corridors across the Mumbai Metropolitan Region × four real storm profiles** — every
 pairing replays through the same engine. Island city to the northern suburbs and across the creek:
@@ -167,7 +174,7 @@ Run the tests:
 python -m pytest tests/ -q
 ```
 
-Twenty tests pin what the pitch claims: tide lock amplifies flooding · two surprising reports diagnose and
+Thirty-one tests pin what the pitch claims: tide lock amplifies flooding · two surprising reports diagnose and
 dispatch a blocked drain exactly once · a full replay produces early trilingual alerts with real lead time ·
 the quiet-day replay sends **zero** street alerts while still catching D-07 · WhatsApp payloads parse into
 reports (depth from "15cm" or "घुटनों तक") · a hardware sensor reading overrides the script · CV depth
@@ -220,6 +227,13 @@ mission-control DNA:
 
 The roadmap items landed early (table above). What remains for the stage is connection and theatre:
 venue Wi-Fi, the live sensor bucket-dunk, and alert thresholds tuned on a Hindmata field walk.
+
+Stage kit, built in: the landing page at `/` opens the pitch (the hero replays the real 205 mm
+curve over Hindmata's real geometry), the **TOUR** button in the war room auto-plays the flagship
+storm with lower-third captions cut from live engine data — dispatch, first alert, tide lock,
+closing KPIs — and every alert that fires lands as a cinematic caption over the map in the
+selected language. The whole instrument works on a phone, so the demo URL survives being opened
+from the audience.
 
 ## Team ALL STARS
 

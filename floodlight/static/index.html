@@ -4,6 +4,13 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>FLOODLIGHT · Ward Instrument</title>
+  <meta name="description" content="The FLOODLIGHT war room: street-segment flood forecasts, trilingual WhatsApp alerts with real lead time, and twin-cause drain diagnosis for Mumbai wards." />
+  <meta name="theme-color" content="#0b0d0f" />
+  <meta property="og:title" content="FLOODLIGHT · Ward Instrument" />
+  <meta property="og:description" content="Run a real Mumbai storm through the ward war room — every street warned, every drain diagnosed." />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="https://floodlight.onrender.com/static/og.png" />
+  <meta name="twitter:card" content="summary_large_image" />
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -35,6 +42,7 @@
     </div>
     <div class="controls">
       <button id="btn-play" class="ctl primary" title="Play / pause replay">▶ Run storm</button>
+      <button id="btn-tour" class="ctl" title="Auto-play the storm with cinematic captions — made for the pitch">Tour</button>
       <button id="btn-reset" class="ctl" title="Reset replay">Reset</button>
       <div class="speed">
         <button data-speed="1" class="spd active">1×</button>
@@ -71,6 +79,11 @@
       </div>
 
       <div id="map-hint" class="overlay-pill soft">Tap any street to see its diagnosis</div>
+
+      <div id="lowerthird" class="teal" hidden>
+        <div class="lt-kicker" id="lt-kicker">—</div>
+        <div class="lt-main" id="lt-main">—</div>
+      </div>
 
       <div id="engine-card" class="panel" hidden>
         <button id="engine-x" title="Close">✕</button>
@@ -131,7 +144,7 @@
           <select id="area-sel"></select>
           <div class="panel-title" style="margin-top:14px">Storm</div>
           <select id="storm-sel"></select>
-          <p id="scenario-note">Three flood-famous wards × four real storm profiles — including 26 July 2005 and a quiet day whose only correct output is silence. Every pairing replays through the same engine.</p>
+          <p id="scenario-note">Eight flood-famous corridors across the MMR × four real storm profiles — including 26 July 2005 and a quiet day whose only correct output is silence. Every pairing replays through the same engine.</p>
         </div>
 
         <div id="node-strip">

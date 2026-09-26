@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FLOODLIGHT — every street warned, every drain diagnosed</title>
+  <meta name="description" content="A ward-level flood nervous system for Mumbai: per-street WhatsApp warnings in Marathi, Hindi and English 15–30 minutes before the water — and a twin-cause engine that catches the blocked drain rain-watching systems miss." />
+  <meta name="theme-color" content="#0b0d0f" />
+  <meta property="og:title" content="FLOODLIGHT — every street warned, every drain diagnosed" />
+  <meta property="og:description" content="Ward-level flood nervous system for Mumbai. Street alerts in mr · hi · en with a T−30 min head start, and a twin-cause engine that diagnoses blocked drains from the gap between expected and observed water." />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="https://floodlight.onrender.com/static/og.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/landing.css" />
+</head>
+<body>
+  <div id="rise"></div>
+
+  <nav id="nav">
+    <a class="wordmark" href="/"><b>FLOOD</b><i>LIGHT</i></a>
+    <span class="nav-tag">CX0404 · MUSA CODEX 2026</span>
+    <div class="nav-links">
+      <a href="#twist">The twist</a>
+      <a href="#pipeline">Pipeline</a>
+      <a href="#live">Live now</a>
+      <a href="#storms">Storms</a>
+      <a href="https://github.com/SaudSatopay/floodlight" target="_blank" rel="noopener">GitHub</a>
+    </div>
+    <a class="cta small" href="/app">Open the war room →</a>
+  </nav>
+
+  <!-- ================================================== HERO -->
+  <header id="hero">
+    <div class="hero-copy">
+      <p class="kicker">Hyperlocal flood warning · Mumbai Metropolitan Region</p>
+      <h1>Every street<br /><span class="u-teal">warned</span>.<br />Every drain<br /><span class="u-amber">diagnosed</span>.</h1>
+      <p class="hero-sub">
+        Hindmata floods within twenty minutes of heavy rain — and the city-scale
+        alert never names the street. FLOODLIGHT is a ward-level flood nervous
+        system: per-street WhatsApp warnings in Marathi, Hindi and English,
+        15–30 minutes before the water, and a twin-cause engine that catches
+        the blocked drain rain-watching systems miss.
+      </p>
+      <div class="hero-ctas">
+        <a class="cta" href="/app">▶ Open the war room</a>
+        <a class="cta ghost" href="/app?storm=monsoon-2005&autoplay=1">Watch 26 July 2005 →</a>
+      </div>
+      <p class="hero-note">live demo · no login · or <a href="/app?tour=1">take the guided tour →</a></p>
+    </div>
+
+    <div class="hero-stage" aria-hidden="true">
+      <canvas id="ward-canvas"></canvas>
+      <div id="chip-layer"></div>
+      <div id="storm-hud">
+        <span id="hud-clock">14:00</span>
+        <span class="hud-sep"></span>
+        <span class="hud-cell">RAIN <b id="hud-rain">0</b> MM/15MIN</span>
+        <span class="hud-cell">TIDE <b id="hud-tide">1.9</b> M</span>
+      </div>
+      <p id="stage-caption">hero replay — the 08 July 2026 curve (205 mm) over Hindmata's real
+        street geometry, from the same engine that runs the instrument</p>
+    </div>
+
+    <div class="hero-stats">
+      <div class="hs"><b>8</b><span>corridors, island city to Thane &amp; Mira Road</span></div>
+      <div class="hs"><b>944<i> mm</i></b><span>26 July 2005 — in the storm library</span></div>
+      <div class="hs"><b>T−30<i> min</i></b><span>average head start before the water</span></div>
+      <div class="hs"><b>मर · हि · EN</b><span>every street alert, three languages</span></div>
+      <div class="hs"><b>₹2,000</b><span>the optional water-level sensor</span></div>
+    </div>
+  </header>
+
+  <!-- ================================================== TWIST -->
+  <section id="twist" class="band">
+    <p class="kicker">The twist</p>
+    <h2>The same ward floods for two different reasons.</h2>
+    <p class="band-sub">Genuine rainfall overload — or a blocked drain, even in moderate rain.
+      A system that only watches rainfall completely misses the second, more common cause.
+      FLOODLIGHT continuously compares what the rain <em>should</em> be doing against what
+      people and sensors actually see.</p>
+
+    <div class="cause-grid">
+      <article class="cause a">
+        <header><span class="cause-badge">■ CAUSE A · RAIN OVERLOAD</span></header>
+        <div class="cause-bars">
+          <div class="cb-row"><span>expected</span><div class="cb-track"><i class="cb-fill teal" data-w="58"></i></div><b>26 cm</b></div>
+          <div class="cb-row"><span>observed</span><div class="cb-track"><i class="cb-fill teal dim" data-w="60"></i></div><b>27 cm</b></div>
+        </div>
+        <p>The gap is small — the sky simply beat the drain. The nowcast projects the
+          surge forward and every subscriber on the street is warned <b>before the water
+          crosses the doorstep</b>.</p>
+        <span class="cause-tag teal">[ T−30 MIN HEAD START · WHATSAPP + IVR ]</span>
+      </article>
+
+      <article class="cause b">
+        <header><span class="cause-badge amber">■ CAUSE B · BLOCKED DRAIN</span></header>
+        <div class="cause-bars">
+          <div class="cb-row"><span>expected</span><div class="cb-track"><i class="cb-fill teal" data-w="14"></i></div><b>6 cm</b></div>
+          <div class="cb-row"><span>observed</span><div class="cb-track"><i class="cb-fill amber" data-w="49"></i></div><b>22 cm</b></div>
+        </div>
+        <p>Far more water than this rain can explain — <b>something is choked
+          underground</b>. The drain's health belief drops and the ward war room gets a
+          dispatch card with the geotagged photo evidence attached.</p>
+        <span class="cause-tag amber">[ DRAIN D-07 FLAGGED · CREW DISPATCHED · MIN 30 ]</span>
+      </article>
+    </div>
+
+    <p class="feedback-line"><span class="fb-dash" aria-hidden="true"></span>
+      The verdict feeds back: one diagnosed drain immediately sharpens every later
+      forecast on its streets. The system learns the ward, storm by storm.</p>
+  </section>
+
+  <!-- ================================================== PIPELINE -->
+  <section id="pipeline" class="band alt">
+    <p class="kicker">The pipeline</p>
+    <h2>Listen. Expect. Compare. Warn.</h2>
+
+    <div class="pipe-grid">
+      <article class="stage">
+        <span class="stage-ix">01</span><h3>LISTEN</h3>
+        <p>15-minute AWS rain windows, the tide clock, geotagged WhatsApp photo
+          reports — each stamped with a CV depth-band estimate — and an optional
+          ₹2k ultrasonic level node.</p>
+      </article>
+      <article class="stage">
+        <span class="stage-ix">02</span><h3>EXPECT</h3>
+        <p>A per-street excess-rain model: drain capacity × bowl factor ×
+          the tide-lock multiplier that seals Mumbai's outfalls past ~3 m.</p>
+      </article>
+      <article class="stage">
+        <span class="stage-ix">03</span><h3>COMPARE</h3>
+        <p>Expected vs observed, street by street. Small gap → Cause A.
+          Large gap → Cause B: the blockage belief updates Bayesian-style
+          and flows back into EXPECT.</p>
+      </article>
+      <article class="stage">
+        <span class="stage-ix">04</span><h3>WARN</h3>
+        <p>Street alerts in Marathi, Hindi and English with real lead time.
+          Dispatch cards carry the drain ID and the evidence — not a hunch.</p>
+      </article>
+    </div>
+    <p class="pipe-foot">one SSE stream feeds the war room · no framework, no build step ·
+      <a href="https://github.com/SaudSatopay/floodlight" target="_blank" rel="noopener">read the engine on GitHub →</a></p>
+  </section>
+
+  <!-- ================================================== LIVE -->
+  <section id="live" class="band">
+    <p class="kicker">Live right now</p>
+    <h2>It's already watching the city.</h2>
+    <p class="band-sub">Not a mock — the same hydrology, fed real 15-minutely rainfall
+      (<a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a>, keyless)
+      across eight flood-famous corridors. These numbers are being computed as you read.</p>
+
+    <div id="live-grid" class="live-grid">
+      <!-- populated by landing.js -->
+    </div>
+    <div class="live-foot">
+      <span id="live-stamp" class="mono-dim">contacting the live feed…</span>
+      <a class="cta ghost" href="/app?live=1">Open LIVE CITY →</a>
+    </div>
+  </section>
+
+  <!-- ================================================== PROOF -->
+  <section id="proof" class="band alt">
+    <p class="kicker">The receipts</p>
+    <h2>Claims a test suite can pin down.</h2>
+
+    <div class="proof-grid">
+      <article class="proof">
+        <h3 class="mono-head">THE ALERT PEOPLE ACTUALLY GET</h3>
+        <div class="wa-bubble">
+          <p lang="mr">⚠ फ्लडलाइट इशारा: Dr Ambedkar Rd · Hindmata Junction येथे ~30 मिनिटांत
+            पाणी साचण्याची शक्यता (~18 सेमी). दुकानातील माल उंच ठेवा.</p>
+          <span class="wa-meta">WhatsApp + IVR · 240 subscribers · storm-min 60</span>
+        </div>
+        <span class="cause-tag teal">[ T−30 MIN HEAD START ]</span>
+        <p class="proof-note">rendered by <code>engine/alerts.py</code> — every street warning
+          generated in mr · hi · en simultaneously; the subscriber's preference picks one.</p>
+      </article>
+
+      <article class="proof">
+        <h3 class="mono-head">THE DAY NOTHING HAPPENS</h3>
+        <p class="proof-big">75 mm Tuesday → <b>zero</b> street alerts.</p>
+        <p class="proof-note">No healthy street buzzes a single phone — and the choked drain
+          still gets caught and dispatched. Pinned by tests across all eight corridors:
+          a 32-replay matrix where silence is the pass condition.</p>
+      </article>
+
+      <article class="proof">
+        <h3 class="mono-head">THE DISPATCH, NOT A HUNCH</h3>
+        <div class="wa-bubble en">
+          <p>🛠 DISPATCH: drain D-07 (Parel Tank Rd lateral) suspected blocked — Parel Tank Rd
+            (east of Hindmata) is flooding at only 9 mm/15min. Confidence 85%. Evidence:
+            2 geotagged report(s) with photos.</p>
+          <span class="wa-meta">Ward war room · storm-min 30</span>
+        </div>
+        <p class="proof-note">the rain-only blind spot, caught in thirty storm-minutes —
+          with the drain ID and the photos attached.</p>
+      </article>
+    </div>
+
+    <p class="test-strip mono-dim">31 tests green — tide lock amplifies flooding · two surprising
+      reports diagnose a drain exactly once · quiet day sends zero alerts · WhatsApp payloads
+      parse ("15cm", "घुटनों तक") · a hardware reading overrides the script · CV depth bands
+      discriminate on real photos</p>
+  </section>
+
+  <!-- ================================================== STORMS -->
+  <section id="storms" class="band">
+    <p class="kicker">The library</p>
+    <h2>Four storms. Eight corridors.<br />Every pairing plays.</h2>
+
+    <div class="storm-list">
+      <a class="storm-row" href="/app?storm=cloudburst&autoplay=1">
+        <b class="sr-mm">205<i> mm</i></b>
+        <span class="sr-name">08 July 2026 · cloudburst</span>
+        <span class="sr-desc">the flagship run — dispatch at min 30, first alert at min 60, tide seals at 15:30</span>
+        <span class="sr-go">RUN →</span>
+      </a>
+      <a class="storm-row" href="/app?storm=monsoon-2005&autoplay=1">
+        <b class="sr-mm">944<i> mm</i></b>
+        <span class="sr-name">26 July 2005</span>
+        <span class="sr-desc">Mumbai's benchmark catastrophe, replayed at AWS cadence</span>
+        <span class="sr-go">RUN →</span>
+      </a>
+      <a class="storm-row" href="/app?storm=monsoon-2017&autoplay=1">
+        <b class="sr-mm">331<i> mm</i></b>
+        <span class="sr-name">29 Aug 2017</span>
+        <span class="sr-desc">the day the city re-lived 2005</span>
+        <span class="sr-go">RUN →</span>
+      </a>
+      <a class="storm-row" href="/app?storm=quiet&autoplay=1">
+        <b class="sr-mm">75<i> mm</i></b>
+        <span class="sr-name">Quiet Tuesday</span>
+        <span class="sr-desc">the day whose only correct output is silence — zero false alarms</span>
+        <span class="sr-go">RUN →</span>
+      </a>
+    </div>
+    <p class="pipe-foot">replay series are synthetic reconstructions shaped after real MCGM AWS
+      records and spring-tide curves — labelled in-app · the live system reads the same shapes
+      from dm.mcgm.gov.in</p>
+  </section>
+
+  <!-- ================================================== FOOTER -->
+  <footer id="foot">
+    <div class="foot-brand">
+      <span class="wordmark"><b>FLOOD</b><i>LIGHT</i></span>
+      <p>Built for MUSA CodeX 2026 · Problem CX0404 “Flood Street, No Warning” ·
+        Smart Cities &amp; Urban Development</p>
+      <p class="mono-dim">TEAM ALL STARS — Saud Satopay · systems, data &amp; integration —
+        Harsh Mishra · backend &amp; inference — Parva Panchal · product &amp; field research</p>
+    </div>
+    <div class="foot-links">
+      <a href="/app">Open the war room →</a>
+      <a href="/app?tour=1">Guided tour</a>
+      <a href="https://github.com/SaudSatopay/floodlight" target="_blank" rel="noopener">Source · MIT</a>
+      <a href="https://open-meteo.com" target="_blank" rel="noopener">Live rain · Open-Meteo</a>
+      <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">Streets © OSM contributors</a>
+    </div>
+    <div class="foot-qr">
+      <img src="/static/qr.svg" alt="QR code — floodlight.onrender.com" width="96" height="96" />
+      <span>scan → live demo<br />floodlight.onrender.com</span>
+    </div>
+  </footer>
+
+  <script src="/static/landing.js"></script>
+</body>
+</html>

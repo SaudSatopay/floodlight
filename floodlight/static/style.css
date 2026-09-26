@@ -340,6 +340,28 @@ small { font-size: 0.68em; color: var(--sub); font-weight: 400; }
 /* rain particle overlay */
 #rain-fx { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 640; pointer-events: none; }
 
+/* cinematic lower-third — alerts and the guided tour speak here */
+#lowerthird {
+  position: absolute; left: 12px; bottom: 46px; z-index: 905;
+  max-width: min(560px, calc(100% - 24px));
+  background: rgba(11, 13, 15, 0.93);
+  border: 1px solid var(--hair2); border-left: 3px solid var(--teal);
+  border-radius: 2px; padding: 11px 16px 12px;
+  animation: ltIn 0.45s cubic-bezier(0.2, 1, 0.3, 1);
+}
+#lowerthird.amber { border-left-color: var(--amber); }
+#lowerthird.red { border-left-color: var(--red); }
+#lowerthird.out { opacity: 0; transform: translateY(8px); transition: opacity 0.45s, transform 0.45s; }
+.lt-kicker { font-family: var(--mono); font-size: 8.5px; font-weight: 600; letter-spacing: 0.18em; color: var(--faint); text-transform: uppercase; }
+#lowerthird.teal .lt-kicker { color: var(--teal); }
+#lowerthird.amber .lt-kicker { color: var(--amber); }
+#lowerthird.red .lt-kicker { color: var(--red); }
+.lt-main { margin-top: 5px; font-size: 14px; font-weight: 600; line-height: 1.45; color: var(--paper); }
+@keyframes ltIn { from { opacity: 0; transform: translateY(12px); } }
+
+/* the Tour button glows faintly while the tour runs */
+#btn-tour.on { color: var(--teal); border-color: var(--teal); }
+
 /* ------------------------------------------------------------ live city */
 #pane-live { padding-bottom: 10px; }
 #live-hero { padding: 18px 18px 14px; border-bottom: 1px solid var(--hair2); }
@@ -466,6 +488,56 @@ small { font-size: 0.68em; color: var(--sub); font-weight: 400; }
 .sky-chip.sky-storm-now { color: var(--red); animation: etaPulse 1.4s ease-in-out infinite; }
 
 .overlay-pill.fc { color: var(--amber); border-color: #4d3a12; }
+
+/* ------------------------------------------------------------ small screens */
+/* Judges open the demo URL on their phones: stack the instrument —
+   map on top, rail below — and keep every control reachable. */
+
+@media (max-width: 1240px) {
+  .brand { padding: 0 12px; }
+  .clockbox, .gauge { padding: 0 10px; }
+  .gauge { min-width: 86px; }
+  .controls { padding: 0 10px; gap: 6px; }
+  .ctl { padding: 8px 9px; }
+  #statusbar { height: auto; min-height: 26px; flex-wrap: wrap; row-gap: 2px; padding: 3px 14px; }
+}
+
+@media (max-width: 900px) {
+  body { display: flex; flex-direction: column; height: 100dvh; }
+  #topbar { flex: none; height: auto; flex-wrap: wrap; padding: 8px 0 0; row-gap: 7px; }
+  #topbar .brand { border-right: 0; align-items: flex-start; }
+  .brand .tag { font-size: 7px; }
+  #topbar .clockbox { margin-left: auto; border-right: 0; align-items: flex-end; }
+  .clock { font-size: 20px; }
+  #topbar .gauges { flex: 1 1 100%; border-top: 1px solid var(--hair); }
+  #topbar .gauge { flex: 1; padding: 6px 12px; border-right: 1px solid var(--hair); }
+  #topbar .gauge:last-child { border-right: 0; }
+  .controls {
+    margin-left: 0; width: 100%; justify-content: space-between;
+    border-top: 1px solid var(--hair); padding: 7px 10px;
+  }
+  .ctl { padding: 7px 9px; font-size: 9.5px; }
+  .spd, .lng { padding: 6px 8px; }
+  #hintbar { display: none; }
+  #layout { flex: 1 1 auto; min-height: 0; height: auto; flex-direction: column; }
+  #map-wrap { flex: 0 0 46%; min-height: 300px; border-right: 0; border-bottom: 1px solid var(--hair2); }
+  #rail { max-width: none; flex: 1 1 auto; min-height: 0; }
+  #engine-card { width: calc(100% - 24px); max-width: 340px; }
+  #lowerthird { bottom: 40px; max-width: calc(100% - 24px); }
+  .lt-main { font-size: 12.5px; }
+  #map-hint { display: none; }
+  .tab { font-size: 9px; letter-spacing: 0.08em; padding: 10px 0 9px; }
+  #summary { padding: 14px 14px 12px; }
+  #summary-line { font-size: 17px; }
+  #summary-sub { font-size: 11.5px; }
+  .kpi { padding: 10px 10px 8px; }
+  .k-num { font-size: 21px; }
+  .k-label { font-size: 6.8px; }
+  #statusbar { flex: none; gap: 12px; font-size: 8px; }
+  #sb-window, #sb-outbox, #sb-sky, #statusbar .right { display: none; }
+  #storm-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .live-big { font-size: 34px; }
+}
 
 @keyframes skyBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2.5px); } }
 @keyframes skDrop { 0% { transform: translateY(-4px); opacity: 0; } 25% { opacity: 0.95; } 80% { opacity: 0.6; } 100% { transform: translateY(5px); opacity: 0; } }
