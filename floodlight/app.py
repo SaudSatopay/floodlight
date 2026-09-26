@@ -92,6 +92,11 @@ class Hub:
 
     def start(self) -> None:
         if not self.running and not self.replay.finished:
+            # a paused/reset loop may still be mid-sleep — if it woke to find
+            # running=True again it would tick alongside the new loop (2×
+            # speed). Cancel it before spawning the replacement.
+            if self._task and not self._task.done():
+                self._task.cancel()
             self.running = True
             self._task = asyncio.get_event_loop().create_task(self._loop())
 

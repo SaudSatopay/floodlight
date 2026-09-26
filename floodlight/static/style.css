@@ -340,6 +340,28 @@ small { font-size: 0.68em; color: var(--sub); font-weight: 400; }
 /* rain particle overlay */
 #rain-fx { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 640; pointer-events: none; }
 
+/* cinematic lower-third — alerts and the guided tour speak here */
+#lowerthird {
+  position: absolute; left: 12px; bottom: 46px; z-index: 905;
+  max-width: min(560px, calc(100% - 24px));
+  background: rgba(11, 13, 15, 0.93);
+  border: 1px solid var(--hair2); border-left: 3px solid var(--teal);
+  border-radius: 2px; padding: 11px 16px 12px;
+  animation: ltIn 0.45s cubic-bezier(0.2, 1, 0.3, 1);
+}
+#lowerthird.amber { border-left-color: var(--amber); }
+#lowerthird.red { border-left-color: var(--red); }
+#lowerthird.out { opacity: 0; transform: translateY(8px); transition: opacity 0.45s, transform 0.45s; }
+.lt-kicker { font-family: var(--mono); font-size: 8.5px; font-weight: 600; letter-spacing: 0.18em; color: var(--faint); text-transform: uppercase; }
+#lowerthird.teal .lt-kicker { color: var(--teal); }
+#lowerthird.amber .lt-kicker { color: var(--amber); }
+#lowerthird.red .lt-kicker { color: var(--red); }
+.lt-main { margin-top: 5px; font-size: 14px; font-weight: 600; line-height: 1.45; color: var(--paper); }
+@keyframes ltIn { from { opacity: 0; transform: translateY(12px); } }
+
+/* the Tour button glows faintly while the tour runs */
+#btn-tour.on { color: var(--teal); border-color: var(--teal); }
+
 /* ------------------------------------------------------------ live city */
 #pane-live { padding-bottom: 10px; }
 #live-hero { padding: 18px 18px 14px; border-bottom: 1px solid var(--hair2); }

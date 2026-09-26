@@ -463,7 +463,7 @@ function renderSummary() {
       line.textContent = "Raining — streets holding.";
       sub.textContent = "The model expects the drains to cope. No alerts needed yet.";
     } else {
-      line.textContent = `${flooding} street${flooding === 1 ? "" : "s"} flooding${blocked ? ` · ${blocked} blocked drain caught` : ""}.`;
+      line.textContent = `${flooding} street${flooding === 1 ? "" : "s"} flooding${blocked ? ` · ${blocked} blocked drain${blocked === 1 ? "" : "s"} caught` : ""}.`;
       sub.textContent = "Red streets already got their WhatsApp warning. Tap any street to see why it flooded.";
     }
   } else if (quiet) {
@@ -1076,7 +1076,7 @@ function renderFeed() {
   }
   for (const a of s.alerts) {
     items.push({
-      minute: a.minute, key: `a-${a.id}`,
+      minute: a.minute, key: `a-${a.id}`, alert: a,
       make: () => {
         if (a.kind === "dispatch") {
           const ev = a.meta && a.meta.drain_id ? a.meta.drain_id : "";
@@ -1100,8 +1100,144 @@ function renderFeed() {
     state.renderedFeed.add(it.key);
     feed.appendChild(it.make());
     bumpFeedBadge();
+    if (it.alert) notifyAlert(it.alert);
   }
   feed.scrollTop = feed.scrollHeight;
+}
+
+/* ---------------------------------------- lower-third + guided tour */
+/* One cinematic caption bar over the map. Live alerts borrow it; the
+   TOUR drives the whole replay with it — every line derived from real
+   snapshot data, nothing scripted that the engine didn't do. */
+
+const lt = { timer: null };
+
+function showLT(kicker, main, tone = "teal", ms = 5200) {
+  const el = $("lowerthird");
+  clearTimeout(lt.timer);
+  el.className = tone;
+  el.hidden = false;
+  el.classList.remove("out");
+  $("lt-kicker").textContent = kicker;
+  $("lt-main").textContent = main;
+  lt.timer = setTimeout(() => {
+    el.classList.add("out");
+    lt.timer = setTimeout(() => { el.hidden = true; }, 500);
+  }, ms);
+}
+
+const tour = { on: false, done: new Set(), holdUntil: 0, sawRun: false };
+
+function startTour() {
+  if (state.mode === "live") document.querySelector('[data-tab="status"]').click();
+  tour.on = true;
+  tour.done.clear();
+  tour.holdUntil = 0;
+  tour.sawRun = false;
+  $("btn-tour").classList.add("on");
+  state.mapHintDone = true;
+  $("map-hint").hidden = true;
+  clearLocalRun();
+  document.querySelectorAll(".spd").forEach((x) => x.classList.toggle("active", x.dataset.speed === "1"));
+  control({ action: "reset" })
+    .then(() => control({ action: "speed", speed: 1 }))
+    .then(() => control({ action: "start" }));
+  const m = state.meta;
+  showLT(`GUIDED RUN · ${m ? m.storm.name.toUpperCase() : "STORM REPLAY"}`,
+    `${state.snap ? state.snap.area_label : "The ward"}, replayed exactly as the gauges recorded it. Watch the streets — and the one drain the rain can't explain.`,
+    "teal", 7000);
+  tour.done.add("intro");
+  tour.holdUntil = Date.now() + 4000;
+}
+
+function endTour() {
+  tour.on = false;
+  $("btn-tour").classList.remove("on");
+  const el = $("lowerthird");
+  el.classList.add("out");
+  setTimeout(() => { el.hidden = true; }, 500);
+}
+
+function segMid(segId) {
+  const trio = state.layers[segId];
+  if (!trio) return null;
+  const ll = trio.core.getLatLngs();
+  return ll[Math.floor(ll.length / 2)];
+}
+
+function tourTick() {
+  const s = state.snap;
+  if (!s || Date.now() < tour.holdUntil) return;
+  // the first snapshots can be the PREVIOUS run (SSE greets us with stale
+  // state while our reset is in flight) — wait until the fresh run ticks
+  if (!tour.sawRun) {
+    if (s.step >= 0 && !s.finished && s.running) tour.sawRun = true;
+    else return;
+  }
+  const fire = (key, hold, fn) => { if (!tour.done.has(key)) { tour.done.add(key); fn(); tour.holdUntil = Date.now() + hold; return true; } return false; };
+
+  const dispatch = s.alerts.find((a) => a.kind === "dispatch");
+  if (dispatch && !tour.done.has("dispatch")) {
+    return void fire("dispatch", 6500, () => {
+      const drainId = dispatch.meta && dispatch.meta.drain_id;
+      const drain = state.meta.drains.find((d) => d.id === drainId);
+      if (drain) map.flyTo([drain.lat, drain.lng], 16, { duration: 1.4 });
+      focusSegment(dispatch.segment_id, false);
+      showLT(`MIN ${dispatch.minute} · CAUSE B · BLOCKED DRAIN`,
+        `Far more water than this rain can explain — ${drainId || "the drain"} flagged, crew dispatched with the photo evidence attached.`,
+        "amber", 7500);
+    });
+  }
+  // showcase a street that got a genuine head start, not the blocked one
+  const street = s.alerts.find((a) => a.kind === "street" && a.lead_min > 0)
+    || (tour.done.has("dispatch") ? s.alerts.find((a) => a.kind === "street") : null);
+  if (street && !tour.done.has("street")) {
+    return void fire("street", 6500, () => {
+      const row = currentRow(street.segment_id);
+      const mid = segMid(street.segment_id);
+      if (mid) map.flyTo(mid, 16, { duration: 1.4 });
+      focusSegment(street.segment_id, false);
+      showLT(`MIN ${street.minute} · CAUSE A · RAIN OVERLOAD`,
+        `${row ? row.name : street.segment_id} — ${street.subscribers} phones buzz in Marathi, Hindi and English${
+          street.lead_min > 0 ? `, T−${street.lead_min} minutes before the water` : ""}.`,
+        "red", 7500);
+    });
+  }
+  if (s.tide_lock >= 0.85 && !tour.done.has("tide")) {
+    return void fire("tide", 5200, () => {
+      map.flyTo(state.meta.area.center, state.meta.area.zoom, { duration: 1.4 });
+      showLT(`TIDE ${s.tide_now.toFixed(1)} M · OUTFALLS SEALED`,
+        "Spring tide seals the outfalls — the same rain now floods far worse. Mumbai's multiplier, encoded in the model.",
+        "amber", 6500);
+    });
+  }
+  if (s.finished && !tour.done.has("finish")) {
+    return void fire("finish", 4000, () => {
+      map.flyTo(state.meta.area.center, state.meta.area.zoom, { duration: 1.6 });
+      $("engine-card").hidden = true; $("engine-prob").hidden = true; state.focusSeg = null;
+      const k = s.kpis;
+      showLT("REPLAY COMPLETE",
+        k.alerts_sent === 0
+          ? "Zero street alerts — the correct output for this day. No healthy street buzzed a phone, and the blocked drain was still caught."
+          : `${k.alerts_sent} streets warned early · ${k.people_warned.toLocaleString("en-IN")} people · avg ${k.avg_lead_min}-minute head start · ${k.drains_flagged} drain${k.drains_flagged === 1 ? "" : "s"} diagnosed.`,
+        "teal", 10000);
+      setTimeout(endTour, 10500);
+    });
+  }
+}
+
+/* live alert toasts — the same lower-third, outside the tour */
+function notifyAlert(a) {
+  const s = state.snap;
+  if (tour.on || !s || !state.running) return;
+  if (a.minute < s.minute - 15) return;              // stale on reconnect
+  if (a.kind === "street") {
+    showLT(`STREET ALERT · T−${a.lead_min} MIN · ${a.subscribers} SUBSCRIBERS · WHATSAPP + IVR`,
+      a.text[state.lang] || a.text.en, "red");
+  } else if (a.kind === "dispatch") {
+    showLT(`WARD DISPATCH · CAUSE B · ${a.meta && a.meta.drain_id ? a.meta.drain_id : "DRAIN"}`,
+      a.text.en, "amber", 6200);
+  }
 }
 
 function renderAll() {
@@ -1111,6 +1247,7 @@ function renderAll() {
   renderEngineCard();
   renderChart();
   renderFeed();
+  if (tour.on) tourTick();
 }
 
 /* -------------------------------------------------------------- stream */
@@ -1144,8 +1281,9 @@ function clearLocalRun() {
   state.focusSeg = null;
 }
 
-$("btn-play").onclick = () => control({ action: state.running ? "pause" : "start" });
-$("btn-reset").onclick = async () => { clearLocalRun(); await control({ action: "reset" }); };
+$("btn-play").onclick = () => { if (tour.on) endTour(); control({ action: state.running ? "pause" : "start" }); };
+$("btn-tour").onclick = () => (tour.on ? endTour() : startTour());
+$("btn-reset").onclick = async () => { if (tour.on) endTour(); clearLocalRun(); await control({ action: "reset" }); };
 $("storm-sel").onchange = async (e) => { clearLocalRun(); await control({ action: "load", storm: e.target.value }); };
 $("area-sel").onchange = async (e) => {
   clearLocalRun();
@@ -1256,12 +1394,33 @@ $("rep-send").onclick = async () => {
 };
 
 /* ---------------------------------------------------------------- boot */
+/* Deep links (the landing page speaks them):
+     /app?storm=monsoon-2005&area=kurla   load a pairing
+     /app?autoplay=1                      press ▶ for the visitor
+     /app?live=1                          open straight into LIVE CITY
+     /app?tour=1                          run the guided tour           */
 
-refreshMeta().then(() => {
+(async () => {
+  const q = new URLSearchParams(location.search);
+  const storm = q.get("storm"), area = q.get("area");
+  if (storm || area) {
+    const body = { action: "load" };
+    if (storm) body.storm = storm;
+    if (area) body.area = area;
+    await control(body).catch(() => {});
+  }
+  await refreshMeta();
   connect();
-  fetch("/api/state").then((r) => r.json()).then((s) => { state.snap = s; renderAll(); });
+  const s = await (await fetch("/api/state")).json();
+  state.snap = s; renderAll();
   fx.canvas = $("rain-fx");
   fx.ctx = fx.canvas.getContext("2d");
   requestAnimationFrame(fxLoop);
   pollLive();                                  // warm the live cache early
-});
+  if (q.get("live") === "1") document.querySelector('[data-tab="live"]').click();
+  else if (q.get("tour") === "1") startTour();
+  else if (q.get("autoplay") === "1") {
+    if (s.finished) { clearLocalRun(); await control({ action: "reset" }); }
+    control({ action: "start" });
+  }
+})();
