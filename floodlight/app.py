@@ -509,7 +509,7 @@ async def region() -> JSONResponse:
             "tier": "HIGH" if p >= 0.6 else "MODERATE" if p >= 0.3 else "LOW",
             "tier_next": "HIGH" if p2 >= 0.6 else "MODERATE" if p2 >= 0.3 else "LOW",
         })
-    payload = {"updated": _time.strftime("%H:%M"), "degraded": degraded,
+    payload = {"updated": _ist_hhmm(), "degraded": degraded,
                "src": fallback, "tide_est": tide, "areas": rows}
     if degraded:
         stale = _serve_stale(_region_last_good.get("mmr"), payload)
@@ -518,6 +518,12 @@ async def region() -> JSONResponse:
     _region_last_good["mmr"] = (now, payload)
     _region_cache.update(ts=now, payload=payload)
     return JSONResponse(payload)
+
+
+def _ist_hhmm() -> str:
+    # the UI narrates in IST; Render's clock is UTC — stamp what we say
+    import datetime as _dt2
+    return (_dt2.datetime.utcnow() + _dt2.timedelta(hours=5, minutes=30)).strftime("%H:%M")
 
 
 _watch_cache: dict = {"ts": 0.0, "payload": None, "full_primary": False}
@@ -580,7 +586,7 @@ async def _stormwatch_payload() -> dict:
             src = "metno"          # chunk lost — keep serving the table
 
     if not _watch_rows:
-        payload = {"updated": _time.strftime("%H:%M"), "degraded": True,
+        payload = {"updated": _ist_hhmm(), "degraded": True,
                    "cities": [], "coverage_n": 0, "coverage_total": total}
         stale = _serve_stale(_watch_last_good.get("earth"), payload)
         _watch_cache.update(ts=now - 30, payload=stale, full_primary=False)
@@ -592,7 +598,7 @@ async def _stormwatch_payload() -> dict:
         r2["age_min"] = int((now - r["_ts"]) / 60)
         rows.append(r2)
     rows.sort(key=lambda r: (r["risk_next_pct"], r["score"]), reverse=True)
-    payload = {"updated": _time.strftime("%H:%M"), "degraded": False,
+    payload = {"updated": _ist_hhmm(), "degraded": False,
                "src": src,
                "coverage_n": len(rows), "coverage_total": total,
                "tide_note": "tide not modelled outside the MMR — scored neutral",
