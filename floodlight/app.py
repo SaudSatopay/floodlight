@@ -499,62 +499,85 @@ async def region() -> JSONResponse:
     return JSONResponse(payload)
 
 
-_watch_cache: dict = {"ts": 0.0, "payload": None}
+_watch_cache: dict = {"ts": 0.0, "payload": None, "full_primary": False}
 _watch_last_good: dict = {}
+_watch_rows: dict = {}            # cid → assessed row (+_ts) — incremental table
+_watch_state: dict = {"cursor": 0}
 
 
 @app.get("/api/stormwatch")
 async def stormwatch() -> JSONResponse:
-    """STORM WATCH · EARTH — scan flood-famous cities worldwide for who is
-    getting hit RIGHT NOW (or within 6 h), ranked. One batched Open-Meteo
-    call; the same hydrology scores a 'typical dense street' per city,
-    honestly labelled an area estimate. The demo's answer to a dry Mumbai
-    afternoon: it is always raining somewhere."""
+    """STORM WATCH · EARTH — rank flood-famous cities worldwide by what the
+    engine reads in their real rain right now. Primary: ONE batched
+    Open-Meteo call. When that IP-throttles (shared-egress hosts arrive
+    pre-throttled), the sweep goes INCREMENTAL: a rotating met.no chunk per
+    request merges into a persistent table, so coverage builds and is never
+    all-or-nothing. Rows carry their age; the payload says its coverage."""
     import datetime as _dt
     now = _time.time()
-    if _watch_cache["payload"] and now - _watch_cache["ts"] < 600:
+    total = len(WATCH_CITIES)
+    fresh = _watch_cache["payload"] and now - _watch_cache["ts"] < (
+        600 if (_watch_cache.get("full_primary") and len(_watch_rows) >= total) else 75)
+    if fresh:
         return JSONResponse(_watch_cache["payload"])
     loop = asyncio.get_running_loop()
-    fallback = None
-    try:
-        met = await loop.run_in_executor(
-            None, fetch_open_meteo_watch, [(c[3], c[4]) for c in WATCH_CITIES])
-    except Exception:
-        try:
-            met = await loop.run_in_executor(
-                None, fetch_metno_many, [(c[3], c[4]) for c in WATCH_CITIES])
-            fallback = "metno"
-        except Exception:
-            met = None
-        payload = {"updated": _time.strftime("%H:%M"), "degraded": True, "cities": []}
-        stale = _serve_stale(_watch_last_good.get("earth"), payload)
-        # brief negative cache so a blocked network doesn't hammer the API
-        _watch_cache.update(ts=now - 480, payload=stale)
-        return JSONResponse(stale)
-
     utc = _dt.datetime.utcnow()
-    rows = []
-    for (cid, city, cc, lat, lng), m in zip(WATCH_CITIES, met):
-        if m.get("dead"):
-            continue                      # one unreachable point ≠ no scan
+
+    def build_row(c, m):
+        cid, city, cc, lat, lng = c
         a = stormwatch_assess(m["past"], m["now"], m["fc_hours"], m["next6_mm"])
         off = m.get("utc_offset_s")
         local = None if off is None else utc + _dt.timedelta(seconds=off)
-        rows.append({
-            "id": cid, "city": city, "cc": cc, "lat": lat, "lng": lng,
-            "rain_now": round(m["now"], 2), "past_3h": round(sum(m["past"]), 1),
-            "next6_mm": m["next6_mm"], "cloud": m["cloud"],
-            "sky": wmo_label(m["code"]),
-            "local": "—" if local is None else local.strftime("%H:%M"),
-            **a,
-        })
+        return {"id": cid, "city": city, "cc": cc, "lat": lat, "lng": lng,
+                "rain_now": round(m["now"], 2), "past_3h": round(sum(m["past"]), 1),
+                "next6_mm": m["next6_mm"], "cloud": m["cloud"],
+                "sky": wmo_label(m["code"]),
+                "local": "—" if local is None else local.strftime("%H:%M"),
+                "_ts": now, **a}
+
+    src, full_primary = None, False
+    try:
+        met = await loop.run_in_executor(
+            None, fetch_open_meteo_watch, [(c[3], c[4]) for c in WATCH_CITIES])
+        for c, m in zip(WATCH_CITIES, met):
+            if not m.get("dead"):
+                _watch_rows[c[0]] = build_row(c, m)
+        full_primary = True
+    except Exception:
+        k = 9
+        start_i = _watch_state["cursor"] % total
+        chunk = [WATCH_CITIES[(start_i + i) % total] for i in range(k)]
+        _watch_state["cursor"] = (start_i + k) % total
+        try:
+            met = await loop.run_in_executor(
+                None, fetch_metno_many, [(c[3], c[4]) for c in chunk])
+            src = "metno"
+            for c, m in zip(chunk, met):
+                if not m.get("dead"):
+                    _watch_rows[c[0]] = build_row(c, m)
+        except Exception:
+            src = "metno"          # chunk lost — keep serving the table
+
+    if not _watch_rows:
+        payload = {"updated": _time.strftime("%H:%M"), "degraded": True,
+                   "cities": [], "coverage_n": 0, "coverage_total": total}
+        stale = _serve_stale(_watch_last_good.get("earth"), payload)
+        _watch_cache.update(ts=now - 30, payload=stale, full_primary=False)
+        return JSONResponse(stale)
+
+    rows = []
+    for r in _watch_rows.values():
+        r2 = {k2: v for k2, v in r.items() if k2 != "_ts"}
+        r2["age_min"] = int((now - r["_ts"]) / 60)
+        rows.append(r2)
     rows.sort(key=lambda r: (r["risk_next_pct"], r["score"]), reverse=True)
     payload = {"updated": _time.strftime("%H:%M"), "degraded": False,
-               "src": fallback,
+               "src": src,
+               "coverage_n": len(rows), "coverage_total": total,
                "tide_note": "tide not modelled outside the MMR — scored neutral",
                "cities": rows}
     _watch_last_good["earth"] = (now, payload)
-    _watch_cache.update(ts=now, payload=payload)
+    _watch_cache.update(ts=now, payload=payload, full_primary=full_primary)
     return JSONResponse(payload)
 
 

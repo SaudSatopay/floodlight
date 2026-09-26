@@ -1222,6 +1222,14 @@ async function pollWatch() {
     state.watch = await (await fetch("/api/stormwatch")).json();
   } catch { return; }
   renderWatch();
+  // incremental sweeps: while coverage is partial (throttled primary),
+  // nudge the server every ~25 s so the table fills within minutes
+  const w = state.watch;
+  clearTimeout(state.watchFastTimer);
+  if (state.mode === "live" && w && (w.degraded ||
+      (w.coverage_total && w.coverage_n < w.coverage_total))) {
+    state.watchFastTimer = setTimeout(pollWatch, 25000);
+  }
   if (state.pendingWatch && state.watch && !state.watch.degraded && state.watch.cities.length) {
     const want = state.pendingWatch;
     state.pendingWatch = null;
@@ -1234,10 +1242,12 @@ function renderWatch() {
   const list = $("watch-list");
   if (!list || !state.watch) return;
   const w = state.watch;
+  const cov = w.coverage_total && w.coverage_n < w.coverage_total
+    ? ` · ${w.coverage_n}/${w.coverage_total} cities` : "";
   $("watch-upd").textContent = w.stale_min
     ? `last good scan ${w.updated} IST · retrying`
     : w.degraded ? "scanner unreachable — retrying"
-    : `updated ${w.updated} IST · ${w.src === "metno" ? "met.no fallback" : "open-meteo"}`;
+    : `updated ${w.updated} IST · ${w.src === "metno" ? "met.no fallback" : "open-meteo"}${cov}`;
   if (w.degraded || !w.cities.length) {
     list.innerHTML = `<div class="watch-wait">${w.degraded
       ? "scanner unreachable from this network — retrying shortly" : "no data yet"}</div>`;
@@ -1253,7 +1263,7 @@ function renderWatch() {
       <span class="wr-risk" style="color:${TIER_COL[c.tier]}">${c.risk_pct}%</span>
       ${rising ? `<span class="rr-next" style="color:${TIER_COL[c.tier_next]}">▲${c.risk_next_pct}%</span>` : ""}
       <span class="wr-city">${c.city} <i>${c.cc}</i></span>
-      <span class="wr-met">${c.rain_now >= 0.2 ? `<b>${c.rain_now.toFixed(1)} MM NOW</b> · ` : ""}3H ${c.past_3h.toFixed(1)} · FC6 ${c.next6_mm.toFixed(1)} · ${c.local} LOCAL</span>`;
+      <span class="wr-met">${c.rain_now >= 0.2 ? `<b>${c.rain_now.toFixed(1)} MM NOW</b> · ` : ""}3H ${c.past_3h.toFixed(1)} · FC6 ${c.next6_mm.toFixed(1)} · ${c.local} LOCAL${c.age_min >= 20 ? ` · ${c.age_min}M OLD` : ""}</span>`;
     div.title = `${c.city}: ${c.sky} · fly there`;
     div.onclick = () => gotoWatchCity(c);
     list.appendChild(div);
