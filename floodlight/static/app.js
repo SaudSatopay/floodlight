@@ -1052,7 +1052,9 @@ async function pollLive() {
   const l = state.live;
   $("live-rain").innerHTML = `${l.rain_now.toFixed(1)}<small> mm / 15 min</small>`;
   const sum = l.outlook && l.outlook.summary;
-  $("live-under").textContent = l.degraded
+  $("live-under").textContent = l.stale_min
+    ? `last good reading · ${l.stale_min} min old — live feed retrying`
+    : l.degraded
     ? "live feed unreachable — showing zero-rain baseline (DEGRADED)"
     : l.rain_now >= 4 ? `heavy rain over ${l.area_label} right now`
     : l.rain_now > 0.2 ? `raining over ${l.area_label} right now`
@@ -1156,7 +1158,9 @@ async function pollRegion() {
   } catch { return; }
   const list = $("region-list");
   if (!list) return;
-  $("region-upd").textContent = state.region.degraded ? "feed degraded" : `updated ${state.region.updated}`;
+  $("region-upd").textContent = state.region.stale_min
+    ? `last good ${state.region.updated} · retrying`
+    : state.region.degraded ? "feed degraded" : `updated ${state.region.updated}`;
   list.innerHTML = "";
   const rows = [...state.region.areas].sort((a, b) => b.risk_pct - a.risk_pct);
   for (const a of rows) {
@@ -1228,7 +1232,9 @@ function renderWatch() {
   const list = $("watch-list");
   if (!list || !state.watch) return;
   const w = state.watch;
-  $("watch-upd").textContent = w.degraded ? "scanner unreachable — retrying"
+  $("watch-upd").textContent = w.stale_min
+    ? `last good scan ${w.updated} IST · retrying`
+    : w.degraded ? "scanner unreachable — retrying"
     : `updated ${w.updated} IST · open-meteo`;
   if (w.degraded || !w.cities.length) {
     list.innerHTML = `<div class="watch-wait">${w.degraded

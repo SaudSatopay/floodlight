@@ -253,7 +253,44 @@ async def sensor(req: Request) -> JSONResponse:
 
 
 _live_cache: dict = {"ts": 0.0, "payload": None}
+_live_last_good: dict = {}      # area_label → (wall_ts, payload) — stale-while-error
 _pt_met_cache: dict = {}
+
+
+def _serve_stale(last_good: tuple | None, payload_if_none: dict) -> dict:
+    """A feed hiccup must never blank the demo: serve the last GOOD payload,
+    honestly stamped as stale, and only fall back to the zero baseline when
+    we have never once succeeded."""
+    if not last_good:
+        return payload_if_none
+    ts, good = last_good
+    out = dict(good)
+    out["stale_min"] = max(1, int((_time.time() - ts) / 60))
+    return out
+
+
+@app.get("/api/diag")
+async def diag() -> JSONResponse:
+    """Field diagnostics: one tiny upstream call, the REAL error out —
+    because 'degraded' on a venue network needs a cause, not a shrug."""
+    import platform, ssl, sys
+    loop = asyncio.get_running_loop()
+
+    def probe() -> dict:
+        t0 = _time.time()
+        try:
+            r = fetch_open_meteo(19.076, 72.877)
+            return {"ok": True, "ms": int((_time.time() - t0) * 1000),
+                    "rain_now": r["now"], "time": r["time"]}
+        except Exception as e:
+            return {"ok": False, "ms": int((_time.time() - t0) * 1000),
+                    "error": f"{type(e).__name__}: {e}"[:400]}
+
+    out = await loop.run_in_executor(None, probe)
+    out["python"] = sys.version.split()[0]
+    out["openssl"] = ssl.OPENSSL_VERSION
+    out["platform"] = platform.platform()
+    return JSONResponse(out)
 
 
 def _point_met(lat: float, lng: float) -> dict:
@@ -328,6 +365,11 @@ async def live_city() -> JSONResponse:
                     "summary": summarize_outlook(met["now"], met.get("cloud_now", 0),
                                                  met.get("hours", []))},
     }
+    if degraded:
+        stale = _serve_stale(_live_last_good.get(area["label"]), payload)
+        _live_cache.update(ts=now - 45, payload=stale)      # retry soon
+        return JSONResponse(stale)
+    _live_last_good[area["label"]] = (now, payload)
     _live_cache.update(ts=now, payload=payload)
     return JSONResponse(payload)
 
@@ -351,6 +393,7 @@ def _area_probe(area_id: str) -> tuple[Segment, float]:
 
 
 _region_cache: dict = {"ts": 0.0, "payload": None}
+_region_last_good: dict = {}
 _region_met: dict = {}          # raw per-corridor rain rows — reused by tap-risk
 
 
@@ -404,11 +447,17 @@ async def region() -> JSONResponse:
         })
     payload = {"updated": _time.strftime("%H:%M"), "degraded": degraded,
                "tide_est": tide, "areas": rows}
+    if degraded:
+        stale = _serve_stale(_region_last_good.get("mmr"), payload)
+        _region_cache.update(ts=now - 60, payload=stale)
+        return JSONResponse(stale)
+    _region_last_good["mmr"] = (now, payload)
     _region_cache.update(ts=now, payload=payload)
     return JSONResponse(payload)
 
 
 _watch_cache: dict = {"ts": 0.0, "payload": None}
+_watch_last_good: dict = {}
 
 
 @app.get("/api/stormwatch")
@@ -428,9 +477,10 @@ async def stormwatch() -> JSONResponse:
             None, fetch_open_meteo_watch, [(c[3], c[4]) for c in WATCH_CITIES])
     except Exception:
         payload = {"updated": _time.strftime("%H:%M"), "degraded": True, "cities": []}
+        stale = _serve_stale(_watch_last_good.get("earth"), payload)
         # brief negative cache so a blocked network doesn't hammer the API
-        _watch_cache.update(ts=now - 480, payload=payload)
-        return JSONResponse(payload)
+        _watch_cache.update(ts=now - 480, payload=stale)
+        return JSONResponse(stale)
 
     utc = _dt.datetime.utcnow()
     rows = []
@@ -448,6 +498,7 @@ async def stormwatch() -> JSONResponse:
     payload = {"updated": _time.strftime("%H:%M"), "degraded": False,
                "tide_note": "tide not modelled outside the MMR — scored neutral",
                "cities": rows}
+    _watch_last_good["earth"] = (now, payload)
     _watch_cache.update(ts=now, payload=payload)
     return JSONResponse(payload)
 
