@@ -9,10 +9,12 @@
 - [ ] Phone: FLOODLIGHT installed from **Add to Home Screen**, hotspot ready if venue Wi-Fi wobbles
 - [ ] Press `?` on stage if you blank — every key is on screen
 
-Open **floodlight.onrender.com/app?watch=1 ten minutes before** you're called: the free
-tier cold-starts in ~1 min, and the world scanner then builds full 32-city coverage within
-~4 minutes even when the shared host is rate-limited (it sweeps in chunks via the met.no
-fallback and keeps every good reading). Keep one tab on `/` and one on `/app`.
+Open **floodlight.onrender.com/app?watch=1 ten minutes before** you're called. A GitHub
+Actions heartbeat pings the service every ten minutes, so it normally never sleeps and the
+scanner meets you already at **32/32 cities**. If the host was redeployed cold, the free tier
+boots in ~1 min and the scanner rebuilds full coverage within ~15 minutes even while
+rate-limited (rotating met.no chunks; the brass bar under the panel title shows the sweep
+filling — every good reading is kept). Keep one tab on `/` and one on `/app`.
 
 **One instrument, shared.** The deployed replay is a single live hub — everyone on the URL
 sees (and can drive) the same storm, which is a great line when the judges' phones and the
