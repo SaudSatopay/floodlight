@@ -406,10 +406,15 @@ async function initHero() {
   sim.chipLayer = $("chip-layer");
   if (!sim.canvas) return;
   sim.ctx = sim.canvas.getContext("2d");
-  let data;
-  try {
-    data = await (await fetch("/api/landing")).json();
-  } catch { return; }        // hero degrades to type-only — still a page
+  let data = null;
+  for (let i = 0; i < 12 && !data; i++) {   // survive a free-tier cold start
+    try {
+      const r = await fetch("/api/landing");
+      if (r.ok) data = await r.json();
+    } catch {}
+    if (!data) await new Promise((res) => setTimeout(res, 1500));
+  }
+  if (!data) return;         // hero degrades to type-only — still a page
   sizeCanvas();
   buildSim(data);
   if (data.storms_all) drawSparks(data.storms_all);
