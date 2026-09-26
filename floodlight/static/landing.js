@@ -52,7 +52,7 @@ const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /* ------------------------------------------------------ hero ward sim */
 
-const COL = { ok: "#3c4c6e", watch: "#ffb43b", alert: "#ff5546", blocked: "#ffb43b" };
+const COL = { ok: "#45577d", watch: "#ffb43b", alert: "#ff5546", blocked: "#ffb43b" };
 const CASING = "#040711";
 const BLOCKED_ID = "parel-tank-rd";
 const WINDOW_S = 2.35;      // real seconds per 15-min storm window
@@ -68,6 +68,12 @@ const sim = {
   running: true,
 };
 
+// On a wide stage the N–S corridor is a thin vertical noodle lost in dark
+// space — so lay it DIAGONALLY (rotate, then fit) and seat it in a faint
+// brass instrument bezel. The north tick on the bezel shows the rotation
+// honestly; the geometry itself stays real.
+const HERO_ROT = -0.99;                       // ~-57°, landscape stages only
+
 function project(features, drains, W, H) {
   let latMin = 90, latMax = -90, lngMin = 180, lngMax = -180;
   const eat = (lat, lng) => {
@@ -77,15 +83,64 @@ function project(features, drains, W, H) {
   for (const f of features) for (const [lng, lat] of f.geometry.coordinates) eat(lat, lng);
   for (const d of drains) eat(d.lat, d.lng);
   const kx = Math.cos(((latMin + latMax) / 2) * Math.PI / 180);
-  const spanX = (lngMax - lngMin) * kx, spanY = latMax - latMin;
-  const pad = 0.06 * Math.min(W, H) + 12;
-  const s = Math.min((W - 2 * pad) / spanX, (H - 2 * pad) / spanY);
-  // bias right of centre — the stage's left edge fades under the headline
-  const ox = (W - spanX * s) / 2 + W * 0.045, oy = (H - spanY * s) / 2;
-  return (lat, lng) => [
-    ox + ((lng - lngMin) * kx) * s,
-    oy + (latMax - lat) * s,
-  ];
+  const rot = W / H >= 1.05 ? HERO_ROT : 0;
+  const cosR = Math.cos(rot), sinR = Math.sin(rot);
+  const raw = (lat, lng) => {
+    const x = (lng - lngMin) * kx, y = (latMax - lat);
+    return [x * cosR - y * sinR, x * sinR + y * cosR];
+  };
+  // bbox of the rotated shape
+  let xMin = 1e9, xMax = -1e9, yMin = 1e9, yMax = -1e9;
+  const eat2 = ([x, y]) => {
+    xMin = Math.min(xMin, x); xMax = Math.max(xMax, x);
+    yMin = Math.min(yMin, y); yMax = Math.max(yMax, y);
+  };
+  for (const f of features) for (const [lng, lat] of f.geometry.coordinates) eat2(raw(lat, lng));
+  for (const d of drains) eat2(raw(d.lat, d.lng));
+  const mx = (xMin + xMax) / 2, my = (yMin + yMax) / 2;
+  // seat the ward inside the bezel: centre right-of-middle (the stage's
+  // left edge fades under the headline), ring sized to the free space
+  const cx = rot ? W * 0.585 : W * 0.5, cy = H * 0.5;
+  const ringR = Math.min(cx, W - cx, cy, H - cy) * 0.94;
+  const s = (ringR - 26) / (0.5 * Math.hypot(xMax - xMin, yMax - yMin));
+  sim.bezel = { cx, cy, r: ringR, north: -Math.PI / 2 + rot };
+  return (lat, lng) => {
+    const [x, y] = raw(lat, lng);
+    return [cx + (x - mx) * s, cy + (y - my) * s];
+  };
+}
+
+function drawBezel(ctx) {
+  const b = sim.bezel;
+  if (!b) return;
+  ctx.save();
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = "rgba(138, 106, 44, 0.4)";               // outer, brass
+  ctx.beginPath(); ctx.arc(b.cx, b.cy, b.r, 0, 2 * Math.PI); ctx.stroke();
+  ctx.strokeStyle = "rgba(43, 61, 99, 0.55)";                // inner, hairline
+  ctx.beginPath(); ctx.arc(b.cx, b.cy, b.r * 0.9, 0, 2 * Math.PI); ctx.stroke();
+  for (let i = 0; i < 24; i++) {                             // tick marks
+    const a = (i * Math.PI) / 12;
+    const major = i % 3 === 0;
+    const r1 = b.r - (major ? 11 : 6);
+    ctx.strokeStyle = `rgba(138, 106, 44, ${major ? 0.45 : 0.28})`;
+    ctx.beginPath();
+    ctx.moveTo(b.cx + Math.cos(a) * r1, b.cy + Math.sin(a) * r1);
+    ctx.lineTo(b.cx + Math.cos(a) * b.r, b.cy + Math.sin(a) * b.r);
+    ctx.stroke();
+  }
+  // honest north: the tick leans exactly as far as the map was rotated
+  ctx.strokeStyle = "rgba(217, 169, 78, 0.75)";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(b.cx + Math.cos(b.north) * (b.r - 16), b.cy + Math.sin(b.north) * (b.r - 16));
+  ctx.lineTo(b.cx + Math.cos(b.north) * (b.r + 4), b.cy + Math.sin(b.north) * (b.r + 4));
+  ctx.stroke();
+  ctx.fillStyle = "rgba(217, 169, 78, 0.85)";
+  ctx.font = '700 11px "Space Mono", monospace';
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText("N", b.cx + Math.cos(b.north) * (b.r - 28), b.cy + Math.sin(b.north) * (b.r - 28));
+  ctx.restore();
 }
 
 function buildSim(data) {
@@ -175,7 +230,7 @@ function dropChip(seg, tone, main, small) {
     let dmin = 1e9;
     for (const s of chipSpots) dmin = Math.min(dmin, Math.hypot(c[0] - s[0], cy - s[1]));
     if (dmin > bestScore) { bestScore = dmin; best = c; }
-    if (dmin > 96) { best = c; break; }
+    if (dmin > 120) { best = c; break; }
   }
   const cy = best[2] === "up" ? best[1] - 30 : best[1] + 30;
   chipSpots.push([best[0], cy]);
@@ -190,6 +245,7 @@ function drawFrame(fade) {
   const { ctx, W, H } = sim;
   ctx.clearRect(0, 0, W, H);
   const now = performance.now();
+  drawBezel(ctx);
 
   // streets: casing under, state colour over, marching dashes where water flows
   for (const s of sim.segs) {
@@ -208,7 +264,7 @@ function drawFrame(fade) {
     path();
     ctx.globalAlpha = fade;
     ctx.strokeStyle = s.state === "ok" ? COL.ok : col;
-    ctx.lineWidth = (s.state === "ok" ? 2.6 : 3.6) + swell;
+    ctx.lineWidth = (s.state === "ok" ? 2.9 : 3.6) + swell;
     if (s.state === "blocked") { ctx.setLineDash([7, 6]); ctx.lineDashOffset = -(now / 55) % 26; }
     else ctx.setLineDash([]);
     ctx.stroke();
