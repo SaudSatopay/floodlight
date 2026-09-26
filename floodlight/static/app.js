@@ -413,6 +413,10 @@ function renderTop() {
     $("btn-play").textContent = s.running ? "❚❚ Pause" : "▶ Run storm";
   }
   $("clock").textContent = s.clock;
+  document.title = state.mode === "live" ? "LIVE · FLOODLIGHT"
+    : s.finished ? `\u2713 ${s.clock} \u00b7 FLOODLIGHT`
+    : state.running ? `\u25b6 ${s.clock} \u00b7 FLOODLIGHT`
+    : "FLOODLIGHT \u00b7 Ward Instrument";
   $("clock-sub").textContent = s.finished ? "replay complete"
     : state.running ? `replay · minute ${s.minute}` : "replay paused";
   $("rain-now").textContent = s.rain_now;

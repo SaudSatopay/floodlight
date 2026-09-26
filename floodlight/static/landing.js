@@ -519,6 +519,25 @@ async function hydrateEarth() {
   setTimeout(hydrateEarth, 600000);
 }
 
+/* nav mirrors the section you are reading */
+(() => {
+  const links = [...document.querySelectorAll(".nav-links a[href^='#']")];
+  if (!links.length) return;
+  const byId = Object.fromEntries(links.map((a) => [a.getAttribute("href").slice(1), a]));
+  const io = new IntersectionObserver((es) => {
+    for (const e of es) {
+      if (!e.isIntersecting) continue;
+      links.forEach((a) => a.classList.remove("here"));
+      const a = byId[e.target.id];
+      if (a) a.classList.add("here");
+    }
+  }, { rootMargin: "-38% 0px -55% 0px" });
+  ["twist", "pipeline", "live", "storms"].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) io.observe(el);
+  });
+})();
+
 initHero();
 hydrateLive();
 hydrateEarth();
