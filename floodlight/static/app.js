@@ -5,6 +5,8 @@
    Weather is drawn, not just numbered: rain particles over the map,
    flow-lines on flooding streets. */
 
+const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
 const state = {
   meta: null,
   snap: null,
@@ -263,6 +265,7 @@ const fx = {
 };
 
 function fxIntensity() {
+  if (REDUCED) return 0;                 // no rain particles for reduced motion
   let mm = state.mode === "live"
     ? ((state.watchSel != null ? state.watchRain : (state.live ? state.live.rain_now : 0)) * 4)
     : (state.snap ? state.snap.rain_now : 0);
@@ -458,6 +461,7 @@ function renderTop() {
     const from = Number(el.dataset.v || 0);
     if (from === target) return;
     el.dataset.v = target;
+    if (REDUCED) { el.innerHTML = render(target); return; }
     const t0 = performance.now();
     const dur = Math.min(700, 250 + Math.abs(target - from) * 10);
     const ease = (k) => 1 - Math.pow(1 - k, 3);
