@@ -195,6 +195,7 @@ em { font-style: italic; }
 
 /* ------------------------------------------------------------------ bands */
 .band { padding: 104px var(--gutter) 96px; }
+.cause-grid, .pipe-grid, .live-grid, .proof-grid, .storm-list { max-width: 1420px; }
 .band.alt { background: var(--bg2); border-top: 1px solid var(--hair); border-bottom: 1px solid var(--hair); }
 .band h2 {
   margin: 0; max-width: 26ch;

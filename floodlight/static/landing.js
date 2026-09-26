@@ -133,10 +133,12 @@ function stormAt(t) {
 function stepDepths(w, dt) {
   const lock = Math.max(0, Math.min(1, (w.tide - 3.0) / 1.5));
   for (const s of sim.segs) {
-    const cap = s.blocked ? 3 : 24 * (1 - 0.5 * lock);
-    const gain = s.blocked ? 0.55 : 0.14;
+    const cap = s.blocked ? 3 : 20 * (1 - 0.5 * lock);
+    // bowl^2.2 staggers the reds: deep bowls drown early, shallow streets
+    // hold at watch — the map reads as judgement, not blanket panic
+    const gain = s.blocked ? 0.55 : 0.16 * Math.pow(s.bowl, 1.2);
     const inflow = Math.max(0, w.rain - cap) * s.bowl * gain;
-    const outflow = (s.blocked ? 0.9 : 2.0) * (1 - 0.75 * lock);
+    const outflow = (s.blocked ? 0.9 : 1.6) * (1 - 0.75 * lock);
     s.depth = Math.max(0, s.depth + (inflow - outflow) * dt);
     if (s.blocked) {
       if (!s.flagged && s.depth >= 8) { s.flagged = true; dropChip(s, "amber",
@@ -249,9 +251,10 @@ function drawFrame(fade) {
 
 function drawRain(intensity, dt) {
   const { ctx, W, H } = sim;
+  const k = Math.max(0.6, W / 900);          // drop density follows the stage
   const layers = [
-    { arr: sim.drops[0], want: intensity * 2.6, spd: 9,  len: 11, a: 0.28, w: 1.1 },
-    { arr: sim.drops[1], want: intensity * 2.2, spd: 15, len: 18, a: 0.5,  w: 1.6 },
+    { arr: sim.drops[0], want: intensity * 2.6 * k, spd: 9,  len: 11, a: 0.28, w: 1.1 },
+    { arr: sim.drops[1], want: intensity * 2.2 * k, spd: 15, len: 18, a: 0.5,  w: 1.6 },
   ];
   for (const L of layers) {
     while (L.arr.length < L.want) L.arr.push({
