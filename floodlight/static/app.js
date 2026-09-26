@@ -207,8 +207,26 @@ function buildArea(meta) {
   }
 }
 
+async function fetchJsonRetry(url, tries = 16, delay = 1500) {
+  // Render free tier can 502 for a few seconds mid cold-start — a judge's
+  // first load must survive that, not die silently with empty selects
+  for (let i = 0; i < tries; i++) {
+    try {
+      const r = await fetch(url);
+      if (r.ok) return await r.json();
+    } catch {}
+    if (i === 0) {
+      const line = $("summary-line"), sub = $("summary-sub");
+      if (line) line.textContent = "Waking the server\u2026";
+      if (sub) sub.textContent = "free-tier cold start \u2014 give it a few seconds.";
+    }
+    await new Promise((res) => setTimeout(res, delay));
+  }
+  throw new Error(`unreachable: ${url}`);
+}
+
 async function refreshMeta() {
-  const meta = await (await fetch("/api/meta")).json();
+  const meta = await fetchJsonRetry("/api/meta");
   state.meta = meta;
   $("storm-name").textContent = meta.storm.name;
   buildArea(meta);
@@ -1810,7 +1828,7 @@ $("rep-send").onclick = async () => {
   }
   await refreshMeta();
   connect();
-  const s = await (await fetch("/api/state")).json();
+  const s = await fetchJsonRetry("/api/state");
   state.snap = s; renderAll();
   fx.canvas = $("rain-fx");
   fx.ctx = fx.canvas.getContext("2d");
