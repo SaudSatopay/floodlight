@@ -1253,7 +1253,13 @@ function clearWatchSel() { state.watchSel = null; state.watchRain = 0; state.wat
 async function pollWatch() {
   try {
     state.watch = await (await fetch("/api/stormwatch")).json();
-  } catch { return; }
+  } catch {
+    // a dropped request must not strand the scanner until the next
+    // 10-minute tick — retry soon while the live pane is open
+    clearTimeout(state.watchFastTimer);
+    if (state.mode === "live") state.watchFastTimer = setTimeout(pollWatch, 20000);
+    return;
+  }
   renderWatch();
   // incremental sweeps: while coverage is partial (throttled primary),
   // nudge the server every ~25 s so the table fills within minutes
