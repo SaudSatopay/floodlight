@@ -112,6 +112,7 @@ Tide is scored neutral outside the MMR and labelled so.</sub></p>
 pip install -r requirements.txt
 python run.py
 # open http://localhost:8737 — the landing page — and step into the war room,
+# (Windows: just double-click run_demo.bat — venv once, fully offline after)
 # or go straight to http://localhost:8737/app and press ▶ RUN STORM.
 # Pressed for time? /app?tour=1 narrates the storm; /app?watch=1 flies to
 # wherever on Earth it is raining right now.
