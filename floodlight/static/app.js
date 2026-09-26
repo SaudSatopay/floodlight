@@ -1294,6 +1294,13 @@ function renderWatch() {
     ? `last good scan ${w.updated} IST · retrying`
     : w.degraded ? "scanner unreachable — retrying"
     : `updated ${w.updated} IST · ${w.src === "metno" ? "met.no fallback" : "open-meteo"}${cov}`;
+  const scan = $("watch-scan");
+  if (scan) {
+    const partial = !w.degraded && w.coverage_total && w.coverage_n < w.coverage_total;
+    scan.hidden = !partial;
+    if (partial) scan.firstElementChild.style.width =
+      `${Math.round((100 * w.coverage_n) / w.coverage_total)}%`;
+  }
   if (w.degraded || !w.cities.length) {
     list.innerHTML = `<div class="watch-wait">${w.degraded
       ? "scanner unreachable from this network — retrying shortly" : "no data yet"}</div>`;
@@ -1785,6 +1792,18 @@ document.addEventListener("keydown", (e) => {
     setTimeout(() => $("earth-pill").click(), state.mode === "live" ? 0 : 700);
   }
 });
+
+$("copy-link").onclick = async () => {
+  const el = $("copy-link");
+  try {
+    await navigator.clipboard.writeText(location.href);
+    el.textContent = "✓ COPIED";
+  } catch {
+    el.textContent = location.host + location.pathname + location.search; // fallback: show it
+  }
+  el.classList.add("done");
+  setTimeout(() => { el.textContent = "⧉ LINK"; el.classList.remove("done"); }, 1600);
+};
 $("storm-sel").onchange = async (e) => { clearLocalRun(); await control({ action: "load", storm: e.target.value }); syncUrl({ storm: e.target.value, live: state.mode === "live" ? 1 : 0 }); };
 $("area-sel").onchange = async (e) => {
   clearLocalRun();
