@@ -52,6 +52,7 @@ const map = L.map("map", {
 }).setView([19.0135, 72.8447], 15);
 
 L.control.zoom({ position: "bottomright" }).addTo(map);
+window.__map = map;                 // demo/scripting handle
 
 const baseTiles = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
   attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
