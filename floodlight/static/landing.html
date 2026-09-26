@@ -14,7 +14,7 @@
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Anton&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/landing.css" />
 </head>
 <body>
@@ -23,6 +23,10 @@
   <nav id="nav">
     <a class="wordmark" href="/"><b>FLOOD</b><i>LIGHT</i></a>
     <span class="nav-tag">CX0404 · MUSA CODEX 2026</span>
+    <div id="ticker" aria-hidden="true"><div class="tk-track">
+      <span>26 JULY 2005 — 944 MM IN A DAY ◆ HINDMATA FLOODS TWENTY MINUTES AFTER HEAVY RAIN ◆ ALERTS IN मराठी · हिंदी · ENGLISH ◆ T−30 MIN AVERAGE HEAD START ◆ A ₹2,000 SENSOR PER STREET ◆ EIGHT CORRIDORS ACROSS THE MMR ◆ ONE DIAGNOSED DRAIN SHARPENS EVERY LATER FORECAST ◆ THE QUIET DAY SENDS ZERO ALERTS ◆ </span>
+      <span>26 JULY 2005 — 944 MM IN A DAY ◆ HINDMATA FLOODS TWENTY MINUTES AFTER HEAVY RAIN ◆ ALERTS IN मराठी · हिंदी · ENGLISH ◆ T−30 MIN AVERAGE HEAD START ◆ A ₹2,000 SENSOR PER STREET ◆ EIGHT CORRIDORS ACROSS THE MMR ◆ ONE DIAGNOSED DRAIN SHARPENS EVERY LATER FORECAST ◆ THE QUIET DAY SENDS ZERO ALERTS ◆ </span>
+    </div></div>
     <div class="nav-links">
       <a href="#twist">The twist</a>
       <a href="#pipeline">Pipeline</a>
@@ -37,7 +41,7 @@
   <header id="hero">
     <div class="hero-copy">
       <p class="kicker">Hyperlocal flood warning · Mumbai Metropolitan Region</p>
-      <h1>Every street<br /><span class="u-teal">warned</span>.<br />Every drain<br /><span class="u-amber">diagnosed</span>.</h1>
+      <h1>Every street,<br /><em>warned.</em><br />Every drain,<br /><em>diagnosed.</em></h1>
       <p class="hero-sub">
         Hindmata floods within twenty minutes of heavy rain — and the city-scale
         alert never names the street. FLOODLIGHT is a ward-level flood nervous
@@ -55,7 +59,7 @@
     <div class="hero-stage" aria-hidden="true">
       <canvas id="ward-canvas"></canvas>
       <div id="chip-layer"></div>
-      <div id="storm-hud">
+      <div id="storm-hud" class="bracket">
         <span id="hud-clock">14:00</span>
         <span class="hud-sep"></span>
         <span class="hud-cell">RAIN <b id="hud-rain">0</b> MM/15MIN</span>
@@ -84,7 +88,7 @@
       people and sensors actually see.</p>
 
     <div class="cause-grid">
-      <article class="cause a">
+      <article class="cause a bracket">
         <header><span class="cause-badge">■ CAUSE A · RAIN OVERLOAD</span></header>
         <div class="cause-bars">
           <div class="cb-row"><span>expected</span><div class="cb-track"><i class="cb-fill teal" data-w="58"></i></div><b>26 cm</b></div>
@@ -96,7 +100,7 @@
         <span class="cause-tag teal">[ T−30 MIN HEAD START · WHATSAPP + IVR ]</span>
       </article>
 
-      <article class="cause b">
+      <article class="cause b bracket">
         <header><span class="cause-badge amber">■ CAUSE B · BLOCKED DRAIN</span></header>
         <div class="cause-bars">
           <div class="cb-row"><span>expected</span><div class="cb-track"><i class="cb-fill teal" data-w="14"></i></div><b>6 cm</b></div>
