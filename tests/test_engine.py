@@ -329,3 +329,39 @@ class TestStormReplay:
         assert k["people_warned"] > 0
         assert k["avg_lead_min"] >= 15
         assert k["drains_flagged"] >= 1
+
+
+class TestStormWatch:
+    """STORM WATCH · EARTH — the global scanner stays honest and ranked."""
+
+    def test_city_table_is_wellformed(self):
+        from floodlight.engine.livefeed import WATCH_CITIES
+        ids = [c[0] for c in WATCH_CITIES]
+        assert len(ids) == len(set(ids)), "city ids must be unique"
+        assert len(WATCH_CITIES) >= 24, "scanner needs global longitude spread"
+        for cid, city, cc, lat, lng in WATCH_CITIES:
+            assert -60 <= lat <= 60 and -180 <= lng <= 180
+            assert cid and city and len(cc) == 2
+
+    def test_dry_city_scores_low_and_quiet(self):
+        from floodlight.engine.livefeed import stormwatch_assess
+        a = stormwatch_assess([0.0] * 12, 0.0, [0.0] * 6, 0.0)
+        assert a["tier"] == "LOW" and a["score"] == 0.0
+        assert a["risk_pct"] <= 10, "a bone-dry city must not read risky"
+
+    def test_steady_moderate_rain_stays_calm(self):
+        # ~16 mm/h all afternoon: a typical street copes — no cried wolf
+        from floodlight.engine.livefeed import stormwatch_assess
+        a = stormwatch_assess([3.0] * 12, 4.0, [4.0] * 6, 24.0)
+        assert a["tier"] == "LOW"
+
+    def test_violent_city_ranks_high_and_projection_climbs(self):
+        from floodlight.engine.livefeed import stormwatch_assess
+        wet = stormwatch_assess([12.0] * 12, 18.0, [20.0] * 6, 120.0)
+        coming = stormwatch_assess([0.3] * 12, 0.5, [14.0] * 6, 84.0)
+        dry = stormwatch_assess([0.2] * 12, 0.1, [0.3] * 6, 1.8)
+        assert wet["tier"] == "HIGH" and wet["tier_next"] == "HIGH"
+        assert wet["risk_next_pct"] >= wet["risk_pct"]
+        assert coming["risk_next_pct"] > coming["risk_pct"], \
+            "a storm still inbound must raise the projected risk"
+        assert wet["score"] > dry["score"] * 10
