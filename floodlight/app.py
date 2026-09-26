@@ -136,8 +136,10 @@ async def lifespan(_: FastAPI):
     task = None
     if live_mode_enabled():
         task = asyncio.get_event_loop().create_task(hub.live_loop())
+    warm = asyncio.get_event_loop().create_task(_watch_warm_loop())
     yield
     hub.pause()
+    warm.cancel()
     if task:
         task.cancel()
 
@@ -150,7 +152,8 @@ app.mount("/static", StaticFiles(directory=STATIC), name="static")
 async def healthz() -> JSONResponse:
     """Deploy health probe (Render/Railway point here)."""
     return JSONResponse({"ok": True, "service": "floodlight",
-                         "storm": hub.replay.storm_id, "finished": hub.replay.finished})
+                         "storm": hub.replay.storm_id, "finished": hub.replay.finished,
+                         "watch_coverage": f"{len(_watch_rows)}/{len(WATCH_CITIES)}"})
 
 
 @app.get("/")
@@ -505,21 +508,21 @@ _watch_rows: dict = {}            # cid → assessed row (+_ts) — incremental 
 _watch_state: dict = {"cursor": 0}
 
 
-@app.get("/api/stormwatch")
-async def stormwatch() -> JSONResponse:
+async def _stormwatch_payload() -> dict:
     """STORM WATCH · EARTH — rank flood-famous cities worldwide by what the
     engine reads in their real rain right now. Primary: ONE batched
     Open-Meteo call. When that IP-throttles (shared-egress hosts arrive
     pre-throttled), the sweep goes INCREMENTAL: a rotating met.no chunk per
-    request merges into a persistent table, so coverage builds and is never
-    all-or-nothing. Rows carry their age; the payload says its coverage."""
+    call merges into a persistent table, so coverage builds and is never
+    all-or-nothing. Rows carry their age; the payload says its coverage.
+    Called by the route AND by the warm loop, cache-guarded either way."""
     import datetime as _dt
     now = _time.time()
     total = len(WATCH_CITIES)
     fresh = _watch_cache["payload"] and now - _watch_cache["ts"] < (
         600 if (_watch_cache.get("full_primary") and len(_watch_rows) >= total) else 75)
     if fresh:
-        return JSONResponse(_watch_cache["payload"])
+        return _watch_cache["payload"]
     loop = asyncio.get_running_loop()
     utc = _dt.datetime.utcnow()
 
@@ -563,7 +566,7 @@ async def stormwatch() -> JSONResponse:
                    "cities": [], "coverage_n": 0, "coverage_total": total}
         stale = _serve_stale(_watch_last_good.get("earth"), payload)
         _watch_cache.update(ts=now - 30, payload=stale, full_primary=False)
-        return JSONResponse(stale)
+        return stale
 
     rows = []
     for r in _watch_rows.values():
@@ -578,7 +581,27 @@ async def stormwatch() -> JSONResponse:
                "cities": rows}
     _watch_last_good["earth"] = (now, payload)
     _watch_cache.update(ts=now, payload=payload, full_primary=full_primary)
-    return JSONResponse(payload)
+    return payload
+
+
+@app.get("/api/stormwatch")
+async def stormwatch() -> JSONResponse:
+    return JSONResponse(await _stormwatch_payload())
+
+
+async def _watch_warm_loop() -> None:
+    """Keep the world scanner full and fresh with no visitor required —
+    a judge opening /app?watch=1 cold should meet a warm planet."""
+    await asyncio.sleep(15)                      # let the server settle
+    while True:
+        try:
+            p = await _stormwatch_payload()
+            full = p.get("coverage_n", 0) >= p.get("coverage_total", 1)
+            throttled = bool(p.get("src")) or p.get("degraded")
+            wait = 80 if (not full or throttled) else 570
+        except Exception:
+            wait = 120
+        await asyncio.sleep(wait)
 
 
 @app.get("/api/risk")
