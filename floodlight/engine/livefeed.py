@@ -393,6 +393,113 @@ def stormwatch_assess(past: list[float], now: float, fc_hours: list[float],
             "tier": tier(p), "tier_next": tier(p2), "score": round(score, 2)}
 
 
+# --------------------------------------------------------------------------
+# met.no fallback — the second, independent weather source. Open-Meteo
+# rate-limits per IP, and shared-egress hosts (Render free tier) can arrive
+# pre-throttled by OTHER people's apps. The Norwegian Met Institute's
+# Locationforecast is free, global and identified by User-Agent instead.
+# It is forecast-only (no past rain) and hourly — so every fallback value
+# is labelled, and past-3h reads honestly unavailable.
+# --------------------------------------------------------------------------
+
+METNO_UA = {"User-Agent": "floodlight-hackathon-demo/0.7 (+https://github.com/SaudSatopay/floodlight)"}
+
+
+def _symbol_to_wmo(symbol: str) -> int:
+    s = (symbol or "").lower()
+    if "thunder" in s: return 95
+    if "heavyrain" in s: return 65
+    if "lightrain" in s or "drizzle" in s: return 61
+    if "rainshowers" in s: return 80
+    if "rain" in s or "sleet" in s or "snow" in s: return 63
+    if "fog" in s: return 45
+    if "partlycloudy" in s: return 2
+    if "cloudy" in s: return 3
+    if "fair" in s: return 1
+    return 0
+
+
+def _metno_hours(lat: float, lng: float, tz_offset_s: int = 19800) -> list[dict]:
+    """First ~13 forecast hours from met.no, one row per hour:
+    {t (local HH:MM), mm, cloud, code}."""
+    import datetime
+    url = ("https://api.met.no/weatherapi/locationforecast/2.0/compact"
+           f"?lat={lat:.4f}&lon={lng:.4f}")
+    req = urllib.request.Request(url, headers=METNO_UA)
+    with urllib.request.urlopen(req, timeout=12) as r:
+        data = json.load(r)
+    rows = []
+    for e in data["properties"]["timeseries"][:16]:
+        n1 = e["data"].get("next_1_hours")
+        if not n1:
+            break
+        inst = e["data"]["instant"]["details"]
+        utc = datetime.datetime.strptime(e["time"], "%Y-%m-%dT%H:%M:%SZ")
+        local = utc + datetime.timedelta(seconds=tz_offset_s)
+        rows.append({
+            "t": local.strftime("%H:%M"),
+            "mm": float(n1["details"].get("precipitation_amount", 0) or 0),
+            "cloud": int(inst.get("cloud_area_fraction", 0) or 0),
+            "code": _symbol_to_wmo(n1.get("summary", {}).get("symbol_code", "")),
+        })
+        if len(rows) >= 13:
+            break
+    if not rows:
+        raise RuntimeError("met.no returned no hourly rows")
+    return rows
+
+
+def fetch_metno(lat: float, lng: float) -> dict:
+    """fetch_open_meteo-shaped payload from met.no. Hourly rain is spread
+    across four 15-min windows; PAST rain does not exist here (zeros) and
+    the caller labels the source so nothing pretends otherwise."""
+    rows = _metno_hours(lat, lng)
+    w = lambda i: rows[min(i, len(rows) - 1)]["mm"] / 4.0
+    hours = [{"t": r["t"], "mm": round(r["mm"], 2), "prob": 0,
+              "cloud": r["cloud"], "code": r["code"]} for r in rows[:12]]
+    return {"past": [0.0] * 12, "now": round(w(0), 2),
+            "next": [round(w(0), 2)] * 3 + [round(w(1), 2)] * 4 + [round(w(2), 2)],
+            "time": rows[0]["t"],
+            "cloud_now": rows[0]["cloud"], "code_now": rows[0]["code"],
+            "hours": hours, "elevation": None}
+
+
+def fetch_metno_many(points: list[tuple[float, float]]) -> list[dict]:
+    """Region/watch-shaped rows from met.no, one call per point (no batch
+    endpoint), politely spaced. One flaky point must not kill the sweep:
+    each point gets a retry, stragglers come back marked dead, and only a
+    mostly-dead sweep raises. Local clocks are unknown here → None."""
+    import time as _t
+    out, dead = [], 0
+    for lat, lng in points:
+        row = None
+        for attempt in (1, 2):
+            try:
+                rows = _metno_hours(lat, lng, tz_offset_s=0)
+                mm0 = rows[0]["mm"] / 4.0
+                fc = [r["mm"] for r in rows[:6]]
+                row = {"lat": lat, "lng": lng,
+                       "past": [0.0] * 12, "now": round(mm0, 2),
+                       "next": [round(mm0, 2)] * 4,
+                       "next6_mm": round(sum(fc), 1), "fc_hours": fc,
+                       "cloud": rows[0]["cloud"], "code": rows[0]["code"],
+                       "utc_offset_s": None}
+                break
+            except Exception:
+                if attempt == 1:
+                    _t.sleep(0.4)
+        if row is None:
+            dead += 1
+            row = {"lat": lat, "lng": lng, "past": [0.0] * 12, "now": 0.0,
+                   "next": [], "next6_mm": 0.0, "fc_hours": [],
+                   "cloud": 0, "code": 0, "utc_offset_s": None, "dead": True}
+        out.append(row)
+        _t.sleep(0.12)
+    if dead > len(points) * 0.6:
+        raise RuntimeError(f"met.no mostly unreachable ({dead}/{len(points)})")
+    return out
+
+
 # Real cloud imagery on the map comes straight from EUMETSAT's open WMS
 # (view.eumetsat.int, keyless): Meteosat-9 IODC sits over the Indian Ocean,
 # so its 10.8 µm infrared channel IS the live cloud picture over Mumbai,

@@ -1052,7 +1052,8 @@ async function pollLive() {
   const l = state.live;
   $("live-rain").innerHTML = `${l.rain_now.toFixed(1)}<small> mm / 15 min</small>`;
   const sum = l.outlook && l.outlook.summary;
-  $("live-under").textContent = l.stale_min
+  const fbNote = l.fallback === "metno" ? " · met.no fallback (hourly forecast, no past rain)" : "";
+  $("live-under").textContent = (l.stale_min
     ? `last good reading · ${l.stale_min} min old — live feed retrying`
     : l.degraded
     ? "live feed unreachable — showing zero-rain baseline (DEGRADED)"
@@ -1061,7 +1062,7 @@ async function pollLive() {
     : sum && (sum.level === "storm-inbound" || sum.level === "rain-soon")
       ? `dry over ${l.area_label} — but rain is on the way (see forecast)`
     : sum && sum.level === "overcast" ? `dry over ${l.area_label} — heavy cloud overhead`
-    : `dry over ${l.area_label} right now`;
+    : `dry over ${l.area_label} right now`) + fbNote;
   $("live-3h").textContent = l.past_3h_total.toFixed(1);
   $("live-next").textContent = l.next.reduce((a, b) => a + b, 0).toFixed(1);
   $("live-tide").textContent = l.tide_est.toFixed(1);
@@ -1160,7 +1161,8 @@ async function pollRegion() {
   if (!list) return;
   $("region-upd").textContent = state.region.stale_min
     ? `last good ${state.region.updated} · retrying`
-    : state.region.degraded ? "feed degraded" : `updated ${state.region.updated}`;
+    : state.region.degraded ? "feed degraded"
+    : `updated ${state.region.updated}${state.region.src === "metno" ? " · met.no" : ""}`;
   list.innerHTML = "";
   const rows = [...state.region.areas].sort((a, b) => b.risk_pct - a.risk_pct);
   for (const a of rows) {
@@ -1235,7 +1237,7 @@ function renderWatch() {
   $("watch-upd").textContent = w.stale_min
     ? `last good scan ${w.updated} IST · retrying`
     : w.degraded ? "scanner unreachable — retrying"
-    : `updated ${w.updated} IST · open-meteo`;
+    : `updated ${w.updated} IST · ${w.src === "metno" ? "met.no fallback" : "open-meteo"}`;
   if (w.degraded || !w.cities.length) {
     list.innerHTML = `<div class="watch-wait">${w.degraded
       ? "scanner unreachable from this network — retrying shortly" : "no data yet"}</div>`;
