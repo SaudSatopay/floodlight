@@ -425,5 +425,24 @@ async function hydrateLive() {
   }
 }
 
+/* RIGHT NOW ON EARTH — the storm-watch teaser under the live grid */
+async function hydrateEarth() {
+  const strip = $("earth-strip");
+  if (!strip) return;
+  let w;
+  try {
+    w = await (await fetch("/api/stormwatch")).json();
+  } catch { setTimeout(hydrateEarth, 30000); return; }
+  if (w.degraded || !w.cities || !w.cities.length) { setTimeout(hydrateEarth, 45000); return; }
+  const wet = w.cities.filter((c) => c.rain_now >= 0.3);
+  const top = (wet.length ? wet : w.cities).slice(0, 3);
+  $("earth-cities").innerHTML = top.map((c) =>
+    `<b>${c.city}</b> ${c.rain_now >= 0.2 ? `${c.rain_now.toFixed(1)} mm now` : `${c.risk_next_pct}% by +6 h`}`
+  ).join(" · ") + ` · scanned ${w.cities.length} cities ${w.updated} IST`;
+  strip.hidden = false;
+  setTimeout(hydrateEarth, 600000);
+}
+
 initHero();
 hydrateLive();
+hydrateEarth();
