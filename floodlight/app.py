@@ -229,6 +229,18 @@ async def control(req: Request) -> JSONResponse:
     elif action == "load":
         hub.reset(body.get("storm"), body.get("area"))
         await hub.broadcast(hub.stamped(hub.replay.snapshot()))
+    elif action == "seek":
+        # jump the replay to a storm window — the chart is a scrubber
+        step = int(body.get("step", 0))
+        was_running = hub.running
+        hub.reset()
+        n = len(hub.replay.storm["rain_mm"])
+        for _ in range(max(0, min(step + 1, n))):
+            hub.replay.tick()
+        await hub._fan_out_new_alerts()
+        if was_running and not hub.replay.finished:
+            hub.start()
+        await hub.broadcast(hub.stamped(hub.replay.snapshot()))
     elif action == "speed":
         hub.speed = max(0.5, min(6.0, float(body.get("speed", 1.0))))
     return JSONResponse({"ok": True, "running": hub.running, "speed": hub.speed,
