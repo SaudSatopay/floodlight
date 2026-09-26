@@ -1626,6 +1626,8 @@ document.addEventListener("keydown", (e) => {
   if (e.key === " ") { e.preventDefault(); $("btn-play").click(); }
   else if (e.key === "t" || e.key === "T") $("btn-tour").click();
   else if (e.key === "r" || e.key === "R") $("btn-reset").click();
+  else if (e.key === "?") $("keys-card").hidden = !$("keys-card").hidden;
+  else if (e.key === "Escape") $("keys-card").hidden = true;
   else if (e.key === "e" || e.key === "E") {
     if (state.mode !== "live") document.querySelector('[data-tab="live"]').click();
     setTimeout(() => $("earth-pill").click(), state.mode === "live" ? 0 : 700);

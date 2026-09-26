@@ -12,6 +12,11 @@ fallback and keeps every good reading). Keep one tab on `/` and one on `/app`.
 | `Space` | Run / pause the storm |
 | `T` | Guided tour (title-card narration, auto camera) |
 | `R` | Reset the replay |
+| `E` | Storm Watch · Earth — fly to the live rain |
+| `?` | Show the stage-keys card on screen |
+
+The RAINFALL chart is a **scrubber**: click any 15-minute bar and the replay jumps
+straight to that window — dispatch minute, tide-lock, the peak — no waiting.
 
 ## The run
 
