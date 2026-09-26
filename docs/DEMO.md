@@ -1,5 +1,14 @@
 # The 3-minute stage run — presenter runbook
 
+## T−10 checklist
+
+- [ ] Open `floodlight.onrender.com/app?watch=1` — wait for the brass scan bar to fill (32/32 cities)
+- [ ] Second tab on `/` (landing), third on `/app?storm=quiet&autoplay=1` paused for the false-alarm question
+- [ ] Venue has speakers? Press `S` once — the confirmation ping doubles as a volume check
+- [ ] `run_demo.bat` already run once on this laptop (offline fallback is then instant)
+- [ ] Phone: FLOODLIGHT installed from **Add to Home Screen**, hotspot ready if venue Wi-Fi wobbles
+- [ ] Press `?` on stage if you blank — every key is on screen
+
 Open **floodlight.onrender.com/app?watch=1 ten minutes before** you're called: the free
 tier cold-starts in ~1 min, and the world scanner then builds full 32-city coverage within
 ~4 minutes even when the shared host is rate-limited (it sweeps in chunks via the met.no
