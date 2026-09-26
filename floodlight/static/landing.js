@@ -522,6 +522,12 @@ async function hydrateEarth() {
     `<b>${c.city}</b> ${c.rain_now >= 0.2 ? `${c.rain_now.toFixed(1)} mm now` : `${c.risk_next_pct}% by +6 h`}`
   ).join(" · ") + ` · scanned ${w.cities.length} cities ${w.updated} IST`;
   strip.hidden = false;
+  // the hero CTA names the live city — the planet answers on the button itself
+  const t0 = top[0], cta = document.querySelector(".cta.ghost");
+  if (cta && t0 && t0.rain_now >= 0.2) {
+    cta.innerHTML = `Where is it flooding right now? →` +
+      ` <b class="cta-now">${t0.city} · ${t0.rain_now.toFixed(1)} mm</b>`;
+  }
   setTimeout(hydrateEarth, 600000);
 }
 
@@ -564,6 +570,36 @@ function drawSparks(storms) {
     const el = document.getElementById(id);
     if (el) io.observe(el);
   });
+})();
+
+/* the printed numbers wake up like the instrument's odometers */
+(function countUps() {
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const run = (el) => {
+    const node = el.childNodes[0];                 // leaves <i> unit suffixes alone
+    if (!node || node.nodeType !== 3) return;
+    const m = node.textContent.match(/^([^0-9]*)([0-9][0-9,]*)$/);
+    if (!m) return;
+    const target = parseInt(m[2].replace(/,/g, ""), 10);
+    if (!isFinite(target) || target === 0) return;
+    const commas = m[2].includes(",");
+    const t0 = performance.now(), dur = 640;
+    const tick = (t) => {
+      const p = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - p, 3);
+      const v = Math.round(target * e);
+      node.textContent = m[1] + (commas ? v.toLocaleString("en-IN") : String(v));
+      if (p < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  };
+  const io = new IntersectionObserver((ents) => {
+    for (const en of ents) {
+      if (!en.isIntersecting) continue;
+      io.unobserve(en.target);
+      run(en.target);
+    }
+  }, { threshold: 0.6 });
+  document.querySelectorAll(".hs b, .sr-mm").forEach((el) => io.observe(el));
 })();
 
 initHero();
