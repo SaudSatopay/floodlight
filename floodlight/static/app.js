@@ -1343,6 +1343,7 @@ function enterLive() {
   }
   renderMap();
   renderHints();
+  syncUrl({ live: 1 });
   $("sb-live").textContent = "LIVE CITY";
 }
 
@@ -1363,6 +1364,7 @@ function exitLive() {
   map.setMinZoom(13);
   if (state.meta) map.setView(state.meta.area.center, state.meta.area.zoom);
   renderMap();
+  syncUrl();
   if (state.snap) renderTop();
 }
 
@@ -1611,6 +1613,17 @@ async function control(body) {
   $("btn-play").textContent = state.running ? "❚❚ Pause" : "▶ Run storm";
 }
 
+function syncUrl(extra = {}) {
+  // the address bar mirrors the loaded pairing — refresh keeps context,
+  // and one-shot params (autoplay/tour/watch) never re-fire on reload
+  if (!state.meta) return;
+  const q = new URLSearchParams();
+  q.set("area", state.meta.active_area);
+  q.set("storm", extra.storm || state.meta.active_storm);
+  if (extra.live) q.set("live", "1");
+  history.replaceState(null, "", `/app?${q.toString()}`);
+}
+
 function clearLocalRun() {
   state.renderedFeed.clear();
   state.feedUnseen = 0;
@@ -1663,12 +1676,13 @@ document.addEventListener("keydown", (e) => {
     setTimeout(() => $("earth-pill").click(), state.mode === "live" ? 0 : 700);
   }
 });
-$("storm-sel").onchange = async (e) => { clearLocalRun(); await control({ action: "load", storm: e.target.value }); };
+$("storm-sel").onchange = async (e) => { clearLocalRun(); await control({ action: "load", storm: e.target.value }); syncUrl({ storm: e.target.value, live: state.mode === "live" ? 1 : 0 }); };
 $("area-sel").onchange = async (e) => {
   clearLocalRun();
   clearWatchSel();
   await control({ action: "load", area: e.target.value });
   await refreshMeta();
+  syncUrl({ live: state.mode === "live" ? 1 : 0 });
   if (state.mode === "live") pollLive();
 };
 
@@ -1815,4 +1829,5 @@ $("rep-send").onclick = async () => {
     if (s.finished) { clearLocalRun(); await control({ action: "reset" }); }
     control({ action: "start" });
   }
+  if (!watchQ) syncUrl({ live: q.get("live") === "1" ? 1 : 0 });
 })();
