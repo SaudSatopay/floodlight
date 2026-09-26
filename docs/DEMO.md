@@ -14,6 +14,7 @@ fallback and keeps every good reading). Keep one tab on `/` and one on `/app`.
 | `R` | Reset the replay |
 | `E` | Storm Watch · Earth — fly to the live rain |
 | `D` | Simulate the sensor bucket-dunk while a storm runs (node flips to LIVE HARDWARE) |
+| `S` | Stage sound (off by default) — alerts ping like sonar, the dispatch lands low, the tide seals with a swell. Worth switching on if the venue has speakers |
 | `?` | Show the stage-keys card on screen |
 
 The RAINFALL chart is a **scrubber**: click any 15-minute bar and the replay jumps

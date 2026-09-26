@@ -442,6 +442,9 @@ function renderTop() {
   $("tide-lock-bar").style.width = `${s.tide_lock * 100}%`;
   $("tide-lock-label").textContent =
     s.tide_lock >= 0.85 ? "OUTFALLS SEALED" : s.tide_lock > 0.3 ? "OUTFALLS CHOKING" : "OUTFALLS OPEN";
+  if (s.tide_lock >= 0.85) {
+    if (!snd.tideLatch) { snd.tideLatch = true; if (snd.on && state.running) sndSwell(); }
+  } else if (s.tide_lock < 0.5) snd.tideLatch = false;
 
   $("sb-window").textContent = `WINDOW ${String(Math.max(0, s.step + 1)).padStart(2, "0")}/${s.rain_full.length} · MIN ${s.minute}`;
   $("sb-live").textContent = state.mode === "live" ? "LIVE CITY"
@@ -1476,9 +1479,75 @@ function renderFeed() {
     state.renderedFeed.add(it.key);
     feed.appendChild(it.make());
     bumpFeedBadge();
-    if (it.alert) notifyAlert(it.alert);
+    if (it.alert) { notifyAlert(it.alert); sndForAlert(it.alert); }
   }
   feed.scrollTop = feed.scrollHeight;
+}
+
+/* ------------------------------------------------------- stage sound */
+/* Opt-in (S key) — a tiny WebAudio synth, no files, works offline.
+   A sonar ping per street alert, a brass thunk when the Cause B crew
+   is dispatched, a low swell when the tide seals the outfalls. */
+
+const snd = { on: false, ctx: null, master: null, lastPing: 0, tideLatch: false };
+
+function sndInit() {
+  if (snd.ctx) return true;
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return false;
+  snd.ctx = new AC();
+  snd.master = snd.ctx.createGain();
+  snd.master.gain.value = 0.5;
+  snd.master.connect(snd.ctx.destination);
+  return true;
+}
+
+function sndTone({ f0, f1, type = "sine", t = 0.6, peak = 0.2, a = 0.012 }) {
+  if (!snd.on || !snd.ctx) return;
+  const c = snd.ctx, t0 = c.currentTime;
+  const o = c.createOscillator(), g = c.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(f0, t0);
+  if (f1) o.frequency.exponentialRampToValueAtTime(f1, t0 + t * 0.85);
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(peak, t0 + a);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + t);
+  o.connect(g); g.connect(snd.master);
+  o.start(t0); o.stop(t0 + t + 0.05);
+}
+
+function sndPing() {                          // street alert — sonar
+  const now = performance.now();
+  if (now - snd.lastPing < 700) return;
+  snd.lastPing = now;
+  sndTone({ f0: 1180, f1: 640, t: 0.55, peak: 0.18 });
+  sndTone({ f0: 1770, f1: 960, t: 0.4, peak: 0.05 });
+}
+function sndThunk() {                         // Cause B dispatch — brass
+  sndTone({ f0: 196, f1: 98, type: "triangle", t: 0.42, peak: 0.26 });
+  sndTone({ f0: 392, f1: 196, type: "triangle", t: 0.3, peak: 0.08 });
+}
+function sndSwell() {                         // outfalls sealed — low tide
+  sndTone({ f0: 82, f1: 55, t: 1.6, peak: 0.2, a: 0.5 });
+  sndTone({ f0: 123, f1: 82, t: 1.3, peak: 0.08, a: 0.45 });
+}
+
+function sndToggle() {
+  if (!sndInit()) { showLT("STAGE SOUND", "WebAudio unavailable in this browser.", "amber", 2600); return; }
+  snd.on = !snd.on;
+  if (snd.ctx.state === "suspended") snd.ctx.resume();
+  $("snd-pill").hidden = !snd.on;
+  showLT(`STAGE SOUND ${snd.on ? "ON" : "OFF"}`,
+    snd.on ? "Alerts ping · the dispatch lands low · the tide seals with a swell."
+           : "Muted.", "teal", 2400);
+  if (snd.on) { snd.lastPing = 0; sndPing(); }
+}
+
+function sndForAlert(a) {
+  if (!snd.on || !state.snap) return;
+  if (a.minute < state.snap.minute - 15) return;   // seek / reconnect backlog stays quiet
+  if (a.kind === "street") sndPing();
+  else if (a.kind === "dispatch") sndThunk();
 }
 
 /* ---------------------------------------- lower-third + guided tour */
@@ -1706,6 +1775,7 @@ document.addEventListener("keydown", (e) => {
   else if (e.key === "?") $("keys-card").hidden = !$("keys-card").hidden;
   else if (e.key === "Escape") $("keys-card").hidden = true;
   else if (e.key === "d" || e.key === "D") sensorDunk();
+  else if (e.key === "s" || e.key === "S") sndToggle();
   else if (e.key === "e" || e.key === "E") {
     if (state.mode !== "live") document.querySelector('[data-tab="live"]').click();
     setTimeout(() => $("earth-pill").click(), state.mode === "live" ? 0 : 700);

@@ -167,8 +167,9 @@ Outside the MMR the tide is scored neutral and the card says so.
 
 File your own citizen report from the composer while the storm runs — the engine ingests it on the next
 window exactly like the scripted WhatsApp traffic. Presenting? **Space** runs/pauses, **T** starts the
-tour, **E** flies to the live rain, **D** simulates the sensor dunk, **?** shows the stage keys — and the
-RAINFALL chart is a **scrubber**: click any window and the replay jumps there.
+tour, **E** flies to the live rain, **D** simulates the sensor dunk, **S** switches on stage sound
+(alerts ping like sonar, the tide seals with a swell — synthesized live, no audio files), **?** shows
+the stage keys — and the RAINFALL chart is a **scrubber**: click any window and the replay jumps there.
 
 <table align="center">
   <tr>

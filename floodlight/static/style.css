@@ -293,6 +293,8 @@ small { font-size: 0.68em; color: var(--sub); font-weight: 400; }
 #statusbar .live::before { content: "◆ "; font-size: 7px; }
 #statusbar .right { margin-left: auto; }
 .kb-hint { color: var(--gold-3); font-weight: 700; }
+#snd-pill { color: var(--ice); font-weight: 700; }
+#snd-pill::after { content: " · "; color: var(--faint); font-weight: 400; }
 
 /* ------------------------------------------------------------ leaflet chrome */
 .leaflet-popup-content-wrapper { background: var(--panel); color: var(--paper); border: 1px solid var(--hair2); border-radius: 2px; box-shadow: 0 14px 40px rgba(2, 4, 10, 0.55); }
