@@ -577,6 +577,7 @@ small { font-size: 0.68em; color: var(--sub); font-weight: 400; }
   #sb-window, #sb-outbox, #sb-sky, #statusbar .right { display: none; }
   .watch-row { flex-wrap: wrap; }
   .wr-met { flex: 1 1 100%; white-space: normal; padding-left: 56px; margin-top: 2px; }
+  .leaflet-container .leaflet-control-attribution { font-size: 8px; max-width: 70vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #storm-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
   .live-big { font-size: 34px; }
 }
