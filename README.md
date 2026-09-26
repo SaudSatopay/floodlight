@@ -93,7 +93,8 @@ prediction on its streets. The system learns the ward, storm by storm.
 The monsoon retreats from Mumbai in late September. The engine does not care: rainfall physics is not
 a Mumbai monopoly. **Storm Watch** sweeps 32 flood-famous cities across every longitude band — Chennai to
 Jakarta, Lagos to Bogotá — in one batched [Open-Meteo](https://open-meteo.com) call, and ranks who the
-engine would be warning *at this minute*, each with its local clock, sky condition and 6-hour projection.
+engine would be warning *at this minute*, each with its local clock, sky condition and a six-hour
+sparkbar strip on one shared scale, so *building / easing / dry ahead* reads at a glance across cities.
 
 Tap a city and the map **flies across the planet** — the EUMETSAT infrared mosaic is global, so the journey
 rides over the real clouds — and answers at the far end with the same honest tap-anywhere card, computed
