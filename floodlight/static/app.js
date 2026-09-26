@@ -1293,15 +1293,26 @@ function renderWatch() {
     return;
   }
   list.innerHTML = "";
-  for (const c of w.cities.slice(0, 10)) {
+  const shown = w.cities.slice(0, 10);
+  // one shared scale so the six-hour strips compare across cities
+  const gmax = Math.max(1, ...shown.flatMap((c) => c.fc6 || []));
+  for (const c of shown) {
     const wet = c.rain_now >= 0.2 || c.tier_next !== "LOW";
     const rising = c.risk_next_pct - c.risk_pct >= 8;
     const div = document.createElement("div");
     div.className = `watch-row${wet ? " wet" : ""}${state.watchSel === c.id ? " sel" : ""}`;
+    let spark = "";
+    if (c.fc6 && c.fc6.length) {
+      const pk = c.fc6.indexOf(Math.max(...c.fc6));
+      spark = `<span class="wr-spark" title="next 6 h · ${c.fc6.map((v) => v.toFixed(1)).join(" · ")} mm/h">${
+        c.fc6.map((v, i) => `<i${i === pk && v >= 0.5 ? ' class="pk"' : ""} style="height:${
+          Math.max(1, Math.round(13 * v / gmax))}px"></i>`).join("")}</span>`;
+    }
     div.innerHTML = `
       <span class="wr-risk" style="color:${TIER_COL[c.tier]}">${c.risk_pct}%</span>
       ${rising ? `<span class="rr-next" style="color:${TIER_COL[c.tier_next]}">▲${c.risk_next_pct}%</span>` : ""}
       <span class="wr-city">${c.city} <i>${c.cc}</i></span>
+      ${spark}
       <span class="wr-met">${c.rain_now >= 0.2 ? `<b>${c.rain_now.toFixed(1)} MM NOW</b> · ` : ""}3H ${c.past_3h.toFixed(1)} · FC6 ${c.next6_mm.toFixed(1)} · ${c.local} LOCAL${c.age_min >= 20 ? ` · ${c.age_min}M OLD` : ""}</span>`;
     div.title = `${c.city}: ${c.sky} · fly there`;
     div.onclick = () => gotoWatchCity(c);

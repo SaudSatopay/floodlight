@@ -558,6 +558,7 @@ async def _stormwatch_payload() -> dict:
         return {"id": cid, "city": city, "cc": cc, "lat": lat, "lng": lng,
                 "rain_now": round(m["now"], 2), "past_3h": round(sum(m["past"]), 1),
                 "next6_mm": m["next6_mm"], "cloud": m["cloud"],
+                "fc6": [round(float(x), 2) for x in (m.get("fc_hours") or [])[:6]],
                 "sky": wmo_label(m["code"]),
                 "local": "—" if local is None else local.strftime("%H:%M"),
                 "_ts": now, **a}

@@ -467,6 +467,9 @@ small { font-size: 0.68em; color: var(--sub); font-weight: 400; }
 .wr-risk { font-family: var(--mono); font-weight: 700; font-variant-numeric: tabular-nums; font-size: 12.5px; width: 46px; }
 .wr-city { flex: 1; font-size: 11.5px; font-weight: 600; color: var(--paper); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wr-city i { font-style: normal; font-family: var(--mono); font-size: 8px; color: var(--faint); letter-spacing: 0.08em; margin-left: 3px; }
+.wr-spark { display: flex; align-items: flex-end; gap: 2px; height: 14px; width: 34px; flex: none; margin-right: 2px; }
+.wr-spark i { width: 4px; background: #3e6e8c; border-radius: 1px 1px 0 0; }
+.wr-spark i.pk { background: var(--amber); }
 .wr-met { font-family: var(--mono); font-size: 8.5px; color: var(--faint); white-space: nowrap; }
 .wr-met b { color: var(--ice); font-weight: 700; }
 .watch-row.wet .wr-met b { animation: etaPulse 2.4s ease-in-out infinite; }
