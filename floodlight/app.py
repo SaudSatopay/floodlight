@@ -147,10 +147,35 @@ async def healthz() -> JSONResponse:
 
 
 @app.get("/")
+async def landing() -> FileResponse:
+    # The pitch page. The instrument itself lives at /app.
+    return FileResponse(STATIC / "landing.html",
+                        headers={"Cache-Control": "no-cache, must-revalidate"})
+
+
+@app.get("/app")
 async def index() -> FileResponse:
     # The shell must never be cached against a newer app.js/style.css.
     return FileResponse(STATIC / "index.html",
                         headers={"Cache-Control": "no-cache, must-revalidate"})
+
+
+_landing_cache: dict = {}
+
+
+@app.get("/api/landing")
+async def landing_data() -> JSONResponse:
+    """Fixed payload for the landing hero: Hindmata's real street geometry +
+    the real 08 July 2026 storm curve — deterministic, independent of
+    whatever area/storm the live replay is currently holding."""
+    if not _landing_cache:
+        area_dir = DATA / "areas" / "hindmata"
+        _landing_cache["payload"] = {
+            "geojson": json.loads((area_dir / "segments.geojson").read_text(encoding="utf-8")),
+            "drains": json.loads((area_dir / "drains.json").read_text(encoding="utf-8"))["drains"],
+            "storm": json.loads((DATA / "storm_replay.json").read_text(encoding="utf-8")),
+        }
+    return JSONResponse(_landing_cache["payload"])
 
 
 @app.get("/api/meta")
