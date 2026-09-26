@@ -1620,6 +1620,31 @@ $("btn-play").onclick = () => { if (tour.on) endTour(); control({ action: state.
 $("btn-tour").onclick = () => (tour.on ? endTour() : startTour());
 $("btn-reset").onclick = async () => { if (tour.on) endTour(); clearLocalRun(); await control({ action: "reset" }); };
 
+// the bucket-dunk, without the bucket: D streams a rising ultrasonic
+// reading through the REAL /api/sensor path while a storm runs — the
+// node flips to LIVE HARDWARE and observed depth climbs on the sensor
+// street. Stage insurance for the hardware moment.
+let dunkBusy = false;
+async function sensorDunk() {
+  if (dunkBusy || !state.meta) return;
+  if (state.mode !== "replay" || !state.running) {
+    showLT("HARDWARE NODE", "Run a storm first — the dunk streams into the live replay.", "amber", 3600);
+    return;
+  }
+  dunkBusy = true;
+  const seg = state.meta.area.sensor_seg;
+  const row = currentRow(seg);
+  showLT("HARDWARE NODE · LIVE", `Ultrasonic level node reporting from ${row ? row.name : seg} — depth rising.`, "teal", 6400);
+  for (const d of [4, 9, 16, 24, 31, 36]) {
+    await fetch("/api/sensor", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ segment: seg, depth_cm: d }),
+    }).catch(() => {});
+    await new Promise((r) => setTimeout(r, 1100));
+  }
+  dunkBusy = false;
+}
+
 // stage shortcuts — hands stay off the trackpad mid-pitch
 document.addEventListener("keydown", (e) => {
   if (e.target !== document.body || e.metaKey || e.ctrlKey || e.altKey) return;
@@ -1628,6 +1653,7 @@ document.addEventListener("keydown", (e) => {
   else if (e.key === "r" || e.key === "R") $("btn-reset").click();
   else if (e.key === "?") $("keys-card").hidden = !$("keys-card").hidden;
   else if (e.key === "Escape") $("keys-card").hidden = true;
+  else if (e.key === "d" || e.key === "D") sensorDunk();
   else if (e.key === "e" || e.key === "E") {
     if (state.mode !== "live") document.querySelector('[data-tab="live"]').click();
     setTimeout(() => $("earth-pill").click(), state.mode === "live" ? 0 : 700);

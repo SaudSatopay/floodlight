@@ -473,6 +473,8 @@ a { color: inherit; text-decoration: none; }
   .pipe-grid { grid-template-columns: 1fr; }
   .stage, .stage:nth-child(odd) { border-right: 0; padding-right: 0; margin-right: 0; }
   .live-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .pipe-return { margin-left: 0; width: 100%; max-width: none; }
+  .pr-txt { white-space: normal; }
   .storm-row { grid-template-columns: 96px 1fr auto; }
   .sr-desc { grid-column: 1 / -1; margin-top: -8px; }
 }

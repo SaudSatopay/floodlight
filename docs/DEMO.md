@@ -13,6 +13,7 @@ fallback and keeps every good reading). Keep one tab on `/` and one on `/app`.
 | `T` | Guided tour (title-card narration, auto camera) |
 | `R` | Reset the replay |
 | `E` | Storm Watch · Earth — fly to the live rain |
+| `D` | Simulate the sensor bucket-dunk while a storm runs (node flips to LIVE HARDWARE) |
 | `?` | Show the stage-keys card on screen |
 
 The RAINFALL chart is a **scrubber**: click any 15-minute bar and the replay jumps
