@@ -74,6 +74,23 @@ Fonts are self-hosted, so the design is pixel-identical offline; the replay, tou
 and 2005 all run from the local process. Only map tiles, the satellite layer and live rain
 need internet, and they degrade gracefully. (macOS/Linux: `python run.py`.)
 
+## The phone moment — put the alert in a judge's hand
+
+Tap **📱 PHONE** in the war-room statusbar → a QR appears. Any phone that scans it becomes
+a resident: pick a street (or all), pick मराठी / हिंदी / English, press **arm**. When you
+press ▶ Run storm on the laptop, that phone **buzzes and pings** with the real trilingual
+alert — the dispatch order lands as an amber card with the drain ID.
+
+- **On the venue demo (localhost):** phone and laptop must share a Wi-Fi / hotspot.
+  `run_demo.bat` now serves the whole LAN; Windows will ask to allow Python through the
+  firewall once — click Allow. If the QR fails, tap the URL under it to cycle addresses.
+- **In the hall (no shared network needed):** judges can scan the same chip on
+  **floodlight.onrender.com/app** — their phone opens `/phone` over the internet and rings
+  off the deployed hub on their own data.
+- Choreography: hand a judge the armed phone *before* you press run. Dispatch buzzes at
+  storm-min 30; the street alert lands ~min 60 — in their hand, in Marathi, with the
+  T−30 tag. Say nothing. Let the phone do it.
+
 ## Pocket copy
 
 FLOODLIGHT installs as an app: open `floodlight.onrender.com/app` on your phone →

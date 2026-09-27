@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#070b16" />
+<title>FLOODLIGHT · resident phone</title>
+<link rel="icon" href="/static/favicon.svg" />
+<link rel="stylesheet" href="/static/vendor/fonts/fonts.css" />
+<style>
+  :root {
+    --bg: #070b16; --panel: #0f1729; --hair: #1c2a47; --hair2: #2b3d63;
+    --cream: #f4ecdd; --cream2: #c9c1ad; --faint: #837f6e;
+    --gold: #d9a94e; --gold2: #f0cc7e; --ice: #a8d8e8; --amber: #ffb43b; --red: #ff5546;
+    --serif: "Fraunces", Georgia, serif; --sans: "Archivo", system-ui, sans-serif;
+    --mono: "Space Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--cream2); font-family: var(--sans);
+    padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+    display: flex; flex-direction: column; overflow: hidden; }
+
+  /* ---- lock-screen idle ---- */
+  #lock { flex: 1; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 6px; padding: 24px; text-align: center;
+    background:
+      radial-gradient(120% 90% at 50% 0%, rgba(43, 61, 99, 0.35), transparent 60%),
+      radial-gradient(rgba(217, 169, 78, 0.05) 1px, transparent 1.2px);
+    background-size: auto, 26px 26px; }
+  #clock { font-family: var(--serif); font-weight: 620; font-size: 74px; line-height: 1;
+    color: var(--cream); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+  #date { font-family: var(--mono); font-size: 11px; letter-spacing: 0.22em;
+    text-transform: uppercase; color: var(--faint); margin-top: 4px; }
+  .wordmark { font-weight: 800; letter-spacing: 0.26em; font-size: 13px; color: var(--cream);
+    margin-top: 30px; }
+  .wordmark b { color: var(--gold); }
+  #status { font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em;
+    color: var(--faint); margin-top: 8px; }
+  #status .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+    background: var(--faint); margin-right: 6px; vertical-align: 1px; }
+  #status.on .dot { background: var(--gold); animation: pulse 1.8s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: 0.3; } }
+
+  #setup { display: flex; flex-direction: column; gap: 10px; width: min(340px, 88vw);
+    margin-top: 26px; }
+  label { font-family: var(--mono); font-size: 9px; letter-spacing: 0.24em;
+    text-transform: uppercase; color: var(--gold); text-align: left; }
+  select { width: 100%; background: var(--panel); color: var(--cream);
+    border: 1px solid var(--hair2); padding: 12px 12px; font-family: var(--sans);
+    font-size: 15px; border-radius: 3px; }
+  .langs { display: flex; gap: 8px; }
+  .langs button { flex: 1; background: var(--panel); color: var(--cream2);
+    border: 1px solid var(--hair2); padding: 10px 0; font-family: var(--mono);
+    font-size: 13px; border-radius: 3px; }
+  .langs button.on { border-color: var(--gold); color: var(--gold2); font-weight: 700; }
+  #arm { margin-top: 6px; background: linear-gradient(180deg, var(--gold2), var(--gold) 55%, #bd8f38);
+    color: #231903; border: 1px solid #8a6a2c; padding: 14px 0; font-weight: 800;
+    letter-spacing: 0.14em; font-size: 13px; border-radius: 3px; text-transform: uppercase; }
+  #hint { font-size: 12px; color: var(--faint); max-width: 40ch; line-height: 1.6; }
+
+  /* ---- incoming alert takeover ---- */
+  #ring { position: fixed; inset: 0; display: none; flex-direction: column;
+    justify-content: flex-start; padding: max(14px, env(safe-area-inset-top)) 12px 12px;
+    background: rgba(4, 6, 13, 0.68); backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px); z-index: 10; overflow-y: auto; }
+  #ring.show { display: flex; }
+  .wa { background: #10161f; border: 1px solid #23303f; border-radius: 14px;
+    padding: 12px 14px 12px; margin-bottom: 10px; animation: drop 0.45s cubic-bezier(0.2, 1.25, 0.4, 1); }
+  .wa.amber { border-color: rgba(255, 180, 59, 0.5); }
+  @keyframes drop { from { transform: translateY(-90px); opacity: 0; } }
+  .wa-top { display: flex; align-items: center; gap: 9px; }
+  .wa-app { width: 30px; height: 30px; border-radius: 8px; flex: none;
+    background: linear-gradient(180deg, var(--gold2), var(--gold)); color: #231903;
+    display: flex; align-items: center; justify-content: center; font-weight: 800;
+    font-size: 14px; }
+  .wa.amber .wa-app { background: linear-gradient(180deg, #ffd27d, var(--amber)); }
+  .wa-meta { flex: 1; min-width: 0; }
+  .wa-title { font-size: 13px; font-weight: 700; color: var(--cream); }
+  .wa-sub { font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em;
+    color: var(--faint); }
+  .wa-now { font-family: var(--mono); font-size: 9px; color: var(--faint); }
+  .wa-body { margin-top: 9px; font-size: 15.5px; line-height: 1.55; color: var(--cream); }
+  .wa-body b { font-family: var(--serif); font-weight: 620; }
+  .wa-tag { display: inline-block; margin-top: 9px; font-family: var(--mono); font-size: 10px;
+    letter-spacing: 0.1em; color: var(--red); border: 1px solid rgba(255, 85, 70, 0.4);
+    padding: 3px 8px; border-radius: 3px; }
+  .wa.amber .wa-tag { color: var(--amber); border-color: rgba(255, 180, 59, 0.4); }
+  #dismiss { margin: 4px auto 0; background: none; border: 1px solid var(--hair2);
+    color: var(--cream2); font-family: var(--mono); font-size: 11px; letter-spacing: 0.16em;
+    padding: 10px 26px; border-radius: 20px; }
+
+  #log { max-height: 34vh; overflow-y: auto; border-top: 1px solid var(--hair);
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); display: none; }
+  #log.has { display: block; }
+  #log h3 { font-family: var(--mono); font-size: 9px; letter-spacing: 0.24em;
+    color: var(--faint); text-transform: uppercase; margin: 0 0 8px; }
+  .lg { font-size: 12.5px; padding: 6px 0; border-bottom: 1px solid rgba(28, 42, 71, 0.5); }
+  .lg b { color: var(--cream); }
+  .lg i { font-family: var(--mono); font-style: normal; font-size: 10px; color: var(--faint); }
+  footer { font-family: var(--mono); font-size: 8.5px; letter-spacing: 0.1em;
+    color: var(--faint); text-align: center; padding: 8px 14px calc(8px + env(safe-area-inset-bottom)); }
+</style>
+</head>
+<body>
+
+<div id="lock">
+  <div id="clock">--:--</div>
+  <div id="date"></div>
+  <div class="wordmark">FLOOD<b>LIGHT</b></div>
+  <div id="status"><span class="dot"></span><span id="status-t">connecting…</span></div>
+  <div id="setup">
+    <label>your street</label>
+    <select id="street"><option value="*">All streets in the ward</option></select>
+    <label>alert language</label>
+    <div class="langs">
+      <button data-l="mr" class="on">मराठी</button>
+      <button data-l="hi">हिंदी</button>
+      <button data-l="en">English</button>
+    </div>
+    <button id="arm">⌁ arm this phone</button>
+    <p id="hint">Keep this screen on. When the storm runs on the war room, street
+      alerts land here — buzz, ping and all.</p>
+  </div>
+</div>
+
+<div id="ring"></div>
+
+<div id="log"><h3>received this storm</h3><div id="log-list"></div></div>
+<footer>demo receiver — in production this is a WhatsApp Business message · FLOODLIGHT CX0404</footer>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const state = { lang: "mr", street: "*", armed: false, seen: new Set(), lastStep: -1, ctx: null };
+
+/* clock */
+setInterval(() => {
+  const d = new Date();
+  $("clock").textContent = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  $("date").textContent = d.toDateString().toUpperCase();
+}, 1000);
+
+/* pickers */
+document.querySelectorAll(".langs button").forEach((b) => {
+  b.onclick = () => {
+    document.querySelectorAll(".langs button").forEach((x) => x.classList.remove("on"));
+    b.classList.add("on"); state.lang = b.dataset.l;
+  };
+});
+$("street").onchange = (e) => { state.street = e.target.value; };
+
+fetch("/api/meta").then((r) => r.json()).then((m) => {
+  for (const f of m.segments_geojson.features) {
+    const o = document.createElement("option");
+    o.value = f.properties.id; o.textContent = f.properties.name;
+    $("street").appendChild(o);
+  }
+}).catch(() => {});
+
+/* the buzz: vibration + the war room's sonar voice */
+function ping(kind) {
+  try { navigator.vibrate && navigator.vibrate(kind === "dispatch" ? [90, 70, 90] : [130, 70, 130, 70, 260]); } catch {}
+  try {
+    if (!state.ctx) state.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const c = state.ctx; if (c.state === "suspended") c.resume();
+    const t0 = c.currentTime;
+    const tone = (f0, f1, type, dur, vol) => {
+      const o = c.createOscillator(), g = c.createGain();
+      o.type = type; o.frequency.setValueAtTime(f0, t0);
+      if (f1) o.frequency.exponentialRampToValueAtTime(f1, t0 + dur * 0.85);
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(vol, t0 + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      o.connect(g); g.connect(c.destination); o.start(t0); o.stop(t0 + dur + 0.05);
+    };
+    if (kind === "dispatch") { tone(196, 98, "triangle", 0.5, 0.3); tone(392, 196, "triangle", 0.34, 0.1); }
+    else { tone(1180, 640, "sine", 0.6, 0.28); tone(1770, 960, "sine", 0.42, 0.08); }
+  } catch {}
+}
+
+$("arm").onclick = () => {
+  state.armed = true; ping("street");
+  $("arm").textContent = "✓ armed — waiting for the storm";
+  $("arm").style.filter = "grayscale(0.4)";
+};
+
+/* incoming card */
+function ringIn(a) {
+  const t = (a.text && (a.text[state.lang] || a.text.en || a.text.mr)) || "";
+  const isD = a.kind === "dispatch";
+  const card = document.createElement("div");
+  card.className = `wa${isD ? " amber" : ""}`;
+  card.innerHTML = `
+    <div class="wa-top">
+      <div class="wa-app">${isD ? "🛠" : "◆"}</div>
+      <div class="wa-meta">
+        <div class="wa-title">${isD ? "FLOODLIGHT · Ward war room" : "FLOODLIGHT alerts"}</div>
+        <div class="wa-sub">${isD ? "DISPATCH ORDER" : `WHATSAPP · STORM-MIN ${a.minute}`}</div>
+      </div>
+      <div class="wa-now">now</div>
+    </div>
+    <div class="wa-body">${t}</div>
+    ${isD ? `<span class="wa-tag">[ CREW DISPATCHED → ${a.meta && a.meta.drain_id || "DRAIN"} ]</span>`
+          : a.lead_min > 0 ? `<span class="wa-tag">[ T−${a.lead_min} MIN HEAD START ]</span>` : ""}`;
+  const ring = $("ring");
+  ring.prepend(card);
+  if (!$("dismiss")) {
+    const d = document.createElement("button");
+    d.id = "dismiss"; d.textContent = "dismiss";
+    d.onclick = () => { ring.classList.remove("show"); ring.querySelectorAll(".wa").forEach((x) => x.remove()); };
+    ring.appendChild(d);
+  }
+  ring.classList.add("show");
+  ping(a.kind);
+  const li = document.createElement("div");
+  li.className = "lg";
+  li.innerHTML = `<i>min ${a.minute}</i> · <b>${isD ? "DISPATCH" : "ALERT"}</b> · ${t.slice(0, 64)}…`;
+  $("log-list").prepend(li);
+  $("log").classList.add("has");
+}
+
+/* stream */
+function connect() {
+  const es = new EventSource("/stream");
+  es.onopen = () => { $("status").classList.add("on"); $("status-t").textContent = "connected to the war room"; };
+  es.onerror = () => { $("status").classList.remove("on"); $("status-t").textContent = "reconnecting…";
+    setTimeout(() => { es.close(); connect(); }, 1500); };
+  es.onmessage = (ev) => {
+    const s = JSON.parse(ev.data);
+    if (s.step < state.lastStep) { state.seen.clear(); }   // replay rewound
+    state.lastStep = s.step;
+    for (const a of s.alerts || []) {
+      if (state.seen.has(a.id)) continue;
+      state.seen.add(a.id);
+      if (!state.armed) continue;
+      if (a.minute < s.minute - 15) continue;              // backlog stays silent
+      if (a.kind !== "street" && a.kind !== "dispatch") continue;
+      if (state.street !== "*" && a.segment_id !== state.street && a.kind !== "dispatch") continue;
+      ringIn(a);
+    }
+  };
+}
+connect();
+</script>
+</body>
+</html>

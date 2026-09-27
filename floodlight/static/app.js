@@ -1959,3 +1959,42 @@ $("rep-send").onclick = async () => {
   }
   if (!watchQ) syncUrl({ live: q.get("live") === "1" ? 1 : 0 });
 })();
+
+/* ---------------------------------------------- resident phone QR */
+/* The statusbar chip opens a QR to /phone: on localhost it offers the
+   LAN addresses (run.py binds 0.0.0.0), deployed it just uses the
+   public origin. Tap the URL to cycle candidates. */
+(function phoneQR() {
+  const chip = $("phone-chip"), modal = $("phone-modal");
+  if (!chip || !modal) return;
+  let urls = [], idx = 0;
+  const draw = () => {
+    const u = urls[idx] || `${location.origin}/phone`;
+    $("pm-url").textContent = u;
+    const box = $("pm-qr");
+    box.innerHTML = "";
+    try {
+      const q = qrcode(0, "M");
+      q.addData(u); q.make();
+      box.innerHTML = q.createSvgTag({ cellSize: 5, margin: 0 });
+    } catch { box.textContent = u; }
+  };
+  const build = async () => {
+    const here = location.hostname;
+    if (here !== "localhost" && here !== "127.0.0.1") {
+      urls = [`${location.origin}/phone`];
+    } else {
+      try {
+        const l = await (await fetch("/api/lan")).json();
+        urls = (l.ips || []).map((ip) => `http://${ip}:${l.port}/phone`);
+      } catch { urls = []; }
+      if (!urls.length) urls = [`${location.origin}/phone`];
+      $("pm-lanwarn").hidden = urls.length < 2;
+    }
+    idx = 0; draw();
+  };
+  chip.onclick = () => { modal.hidden = false; build(); };
+  $("pm-close").onclick = () => { modal.hidden = true; };
+  modal.addEventListener("click", (e) => { if (e.target === modal) modal.hidden = true; });
+  $("pm-url").onclick = () => { idx = (idx + 1) % Math.max(1, urls.length); draw(); };
+})();

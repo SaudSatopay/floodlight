@@ -86,6 +86,19 @@
 
       <div id="map-hint" class="overlay-pill soft">Tap any street to see its diagnosis</div>
 
+      <div id="phone-modal" hidden>
+        <div class="pm-card">
+          <div class="panel-title">The resident's phone</div>
+          <div id="pm-qr"></div>
+          <p id="pm-url" class="pm-url">—</p>
+          <p class="pm-note">Phone on the same Wi-Fi / hotspot → scan → pick a street +
+            language → <b>arm</b>. When the storm runs here, the phone buzzes with the
+            real trilingual alert. <span id="pm-lanwarn" hidden>Multiple network addresses
+            found — if one QR fails, tap the URL to cycle.</span></p>
+          <button id="pm-close" class="ctl">CLOSE</button>
+        </div>
+      </div>
+
       <div id="keys-card" class="panel" hidden>
         <div class="panel-title">Stage keys</div>
         <div class="kc-grid">
@@ -95,6 +108,7 @@
           <b>E</b><span>Storm Watch · Earth</span>
           <b>D</b><span>simulate the sensor dunk (storm running)</span>
           <b>S</b><span>stage sound — alerts ping, dispatch thunks (off by default)</span>
+          <b>📱</b><span>PHONE chip (statusbar) — alerts ring on a phone via QR</span>
           <b>Chart</b><span>click a rain bar — the replay jumps there</span>
           <b>?</b><span>show / hide this card</span>
         </div>
@@ -283,10 +297,11 @@
     <span id="sb-window">WINDOW 00/12</span>
     <span id="sb-outbox">WA OUTBOX · SIM · 0</span>
     <span id="sb-sky" hidden></span>
-    <span class="right"><b id="copy-link" title="Copy a link to this exact view">⧉ LINK</b><b id="snd-pill" hidden>♪ SOUND</b><b class="kb-hint">? STAGE KEYS</b> · FLOODLIGHT v0.7 · CX0404 · TEAM ALL STARS</span>
+    <span class="right"><b id="phone-chip" title="Put the alerts on a phone">📱 PHONE</b><b id="copy-link" title="Copy a link to this exact view">⧉ LINK</b><b id="snd-pill" hidden>♪ SOUND</b><b class="kb-hint">? STAGE KEYS</b> · FLOODLIGHT v0.7 · CX0404 · TEAM ALL STARS</span>
   </footer>
 
   <script src="/static/vendor/leaflet/leaflet.js"></script>
+  <script src="/static/vendor/qrcode.js"></script>
   <script src="/static/vendor/leaflet-heat.js"></script>
   <script src="/static/app.js"></script>
 </body>
