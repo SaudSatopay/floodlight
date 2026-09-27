@@ -598,6 +598,7 @@ function liveCell(a) {
     <span class="lv-sub">RAIN ${a.rain_now.toFixed(1)} MM · 3H ${a.past_3h.toFixed(1)} MM${
       a.cloud != null ? ` · CLOUD ${a.cloud}%` : ""}${rising ? ` · +${a.next6_mm} MM FC` : ""}</span>`;
   el.title = `open ${a.label} in LIVE CITY`;
+  if (a.rain_now >= 0.2) el.classList.add("raining");
   return el;
 }
 
@@ -660,6 +661,7 @@ async function hydrateEarth() {
 /* storm library sparklines — each storm's real curve, in its row */
 function drawSparks(storms) {
   // one shared scale — 2005 must TOWER and the quiet day must whisper
+  drawSparks.data = storms;
   const gmax = Math.max(...storms.flatMap((st) => st.rain_mm), 1);
   for (const st of storms) {
     const row = document.querySelector(`.storm-row[href*="storm=${st.id}"]`);
@@ -799,3 +801,223 @@ initHero();
 heroFilm();
 hydrateLive();
 hydrateEarth();
+
+/* ------------------------------------------------- the monsoon layer */
+/* One fixed canvas over the page: sparse drizzle, the odd droplet
+   running down the glass, paper boats drifting the section waterlines,
+   and every click landing like a raindrop. All of it honest to the
+   world of the product; none of it under reduced motion. */
+(function monsoon() {
+  if (REDUCED) return;
+  const cv = $("monsoon");
+  if (!cv) return;
+  const mx = cv.getContext("2d");
+  let W = 0, H = 0, dpr = 1;
+  const size = () => {
+    dpr = Math.min(2, devicePixelRatio || 1);
+    W = innerWidth; H = innerHeight;
+    cv.width = W * dpr; cv.height = H * dpr;
+    mx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  };
+  size();
+
+  /* drizzle */
+  const DN = innerWidth < 760 ? 8 : 15;
+  const drops = Array.from({ length: DN }, () => ({
+    x: Math.random() * 1.2 * W - 0.1 * W, y: 110 + Math.random() * (H - 110),
+    s: 240 + Math.random() * 110, l: 12 + Math.random() * 7,
+  }));
+
+  /* paper boats on the section waterlines */
+  const laneIds = ["twist", "live", "storms"];
+  let lanes = [];
+  const relane = () => {
+    lanes = laneIds.map((id) => {
+      const el = document.getElementById(id);
+      return el ? el.getBoundingClientRect().top + scrollY - 22 : -1;
+    }).filter((y) => y > 0);
+  };
+  relane();
+  const boats = lanes.map((_, i) => ({
+    lane: i, x: Math.random() * W, dir: i % 2 ? -1 : 1,
+    v: 13 + Math.random() * 9, ph: Math.random() * 6.3,
+  }));
+
+  /* glass droplet runs */
+  let runs = [], nextRun = performance.now() + 4000;
+
+  /* click ripples */
+  let ripples = [];
+  addEventListener("pointerdown", (e) => {
+    if (e.clientY < 100) return;
+    ripples.push({ x: e.clientX, y: e.clientY, t0: performance.now() });
+    if (ripples.length > 5) ripples.shift();
+  }, { passive: true });
+
+  let rsz2;
+  addEventListener("resize", () => { clearTimeout(rsz2); rsz2 = setTimeout(() => { size(); relane(); }, 200); });
+  setInterval(relane, 4000);              // layout drifts as media loads
+
+  function boat(x, y, tilt, a) {
+    mx.save();
+    mx.translate(x, y); mx.rotate(tilt);
+    mx.lineWidth = 1.2; mx.lineJoin = "round";
+    mx.strokeStyle = `rgba(201, 193, 173, ${a})`;
+    mx.beginPath();                        // hull
+    mx.moveTo(-15, 0); mx.lineTo(15, 0); mx.lineTo(8, 7); mx.lineTo(-8, 7); mx.closePath();
+    mx.stroke();
+    mx.beginPath();                        // sails
+    mx.moveTo(-2, -1); mx.lineTo(-2, -12); mx.lineTo(-11, -1); mx.closePath();
+    mx.moveTo(2, -1); mx.lineTo(2, -14); mx.lineTo(11, -1); mx.closePath();
+    mx.stroke();
+    mx.strokeStyle = `rgba(217, 169, 78, ${a * 0.9})`;   // brass waterline
+    mx.beginPath(); mx.moveTo(-15, 0); mx.lineTo(15, 0); mx.stroke();
+    mx.strokeStyle = `rgba(168, 216, 232, ${a * 0.35})`; // reflection
+    mx.beginPath(); mx.moveTo(-10, 10); mx.lineTo(-2, 10); mx.moveTo(3, 12); mx.lineTo(9, 12); mx.stroke();
+    mx.restore();
+  }
+
+  window.__monsoon = { boats, lanes: () => lanes, ripples };   // demo handle
+  let last = performance.now();
+  function tick(now) {
+    requestAnimationFrame(tick);
+    if (document.hidden) { last = now; return; }
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    mx.clearRect(0, 0, W, H);
+
+    /* drizzle */
+    mx.strokeStyle = "rgba(168, 216, 232, 0.13)";
+    mx.lineWidth = 1.1;
+    mx.beginPath();
+    for (const d of drops) {
+      mx.moveTo(d.x, d.y); mx.lineTo(d.x - d.l * 0.22, d.y + d.l);
+      d.x -= d.s * 0.22 * dt; d.y += d.s * dt;
+      if (d.y > H + 20) { d.y = 96 - Math.random() * 40; d.x = Math.random() * 1.2 * W; }
+    }
+    mx.stroke();
+
+    /* droplet runs down the glass */
+    if (now > nextRun && runs.length < 2) {
+      runs.push({ x: 60 + Math.random() * (W - 120), y: 130 + Math.random() * H * 0.5, d: 0, v: 26 });
+      nextRun = now + 7000 + Math.random() * 6000;
+    }
+    runs = runs.filter((r) => r.d < 130);
+    for (const r of runs) {
+      r.v = Math.min(95, r.v + 55 * dt);
+      const step = r.v * dt;
+      r.y += step; r.d += step;
+      r.x += Math.sin(r.y * 0.09) * 0.55;
+      const fade = 1 - r.d / 130;
+      mx.strokeStyle = `rgba(168, 216, 232, ${0.12 * fade})`;
+      mx.lineWidth = 1.6;
+      mx.beginPath(); mx.moveTo(r.x, r.y - 13); mx.lineTo(r.x, r.y); mx.stroke();
+      mx.fillStyle = `rgba(168, 216, 232, ${0.36 * fade})`;
+      mx.beginPath(); mx.arc(r.x, r.y, 1.7, 0, 7); mx.fill();
+      mx.fillStyle = `rgba(244, 236, 221, ${0.3 * fade})`;
+      mx.beginPath(); mx.arc(r.x - 0.5, r.y - 0.6, 0.5, 0, 7); mx.fill();
+    }
+
+    /* boats (not on phones — the lanes need open water) */
+    for (const b of (W < 760 ? [] : boats)) {
+      const laneY = lanes[b.lane];
+      if (!laneY) continue;
+      b.x += b.dir * b.v * dt;
+      if (b.x > W + 60) b.x = -60;
+      if (b.x < -60) b.x = W + 60;
+      const y = laneY - scrollY + Math.sin(now / 900 + b.ph) * 3;
+      if (y < 90 || y > H + 30) continue;
+      boat(b.x, y, Math.sin(now / 1300 + b.ph) * 0.07 * b.dir, 0.5);
+    }
+
+    /* click ripples */
+    ripples = ripples.filter((p) => now - p.t0 < 700);
+    for (const p of ripples) {
+      const k = (now - p.t0) / 700;
+      mx.lineWidth = 1.4;
+      mx.strokeStyle = `rgba(168, 216, 232, ${0.3 * (1 - k)})`;
+      mx.beginPath(); mx.arc(p.x, p.y, 8 + k * 46, 0, 7); mx.stroke();
+      mx.strokeStyle = `rgba(217, 169, 78, ${0.2 * (1 - k)})`;
+      mx.beginPath(); mx.arc(p.x, p.y, 4 + k * 27, 0, 7); mx.stroke();
+    }
+  }
+  requestAnimationFrame(tick);
+})();
+
+/* storm rows replay their spark + roll the millimetres on hover */
+(function rowReplay() {
+  if (REDUCED || !matchMedia("(hover: hover)").matches) return;
+  const ease3 = (k) => 1 - Math.pow(1 - Math.min(1, k), 3);
+  document.querySelectorAll(".storm-row").forEach((row) => {
+    let busy = 0;
+    row.addEventListener("mouseenter", () => {
+      const now = performance.now();
+      if (now - busy < 700) return;
+      busy = now;
+      const storms = drawSparks.data || [];
+      const st = storms.find((x) => row.href.includes(`storm=${x.id}`));
+      const cvs = row.querySelector(".sr-spark");
+      if (st && cvs) {
+        const c2 = cvs.getContext("2d");
+        const gmax = Math.max(...storms.flatMap((x) => x.rain_mm), 1);
+        const peak = st.rain_mm.indexOf(Math.max(...st.rain_mm));
+        const bw = 200 / st.rain_mm.length;
+        const t0 = now;
+        (function grow(ts) {
+          const k = ease3((ts - t0) / 430);
+          c2.clearRect(0, 0, 200, 44);
+          st.rain_mm.forEach((mm, i) => {
+            const kk = ease3(((ts - t0) / 430) * 1.5 - (i / st.rain_mm.length) * 0.5);
+            const h = Math.max(1.5, (mm / gmax) * 40 * kk);
+            c2.fillStyle = i === peak ? "#ffb43b" : "#3e6e8c";
+            c2.fillRect(i * bw + 2, 42 - h, bw - 4, h);
+          });
+          if (k < 1) requestAnimationFrame(grow);
+        })(now);
+      }
+      const b = row.querySelector(".sr-mm");
+      const node = b && b.childNodes[0];
+      if (node && node.nodeType === 3) {
+        const target = parseInt(node.textContent, 10);
+        if (target) {
+          const t0n = now;
+          (function roll(ts) {
+            const k = ease3((ts - t0n) / 380);
+            node.textContent = String(Math.round(target * k));
+            if (k < 1) requestAnimationFrame(roll);
+          })(now);
+        }
+      }
+    });
+  });
+})();
+
+/* the alert types itself when the receipts come into view */
+(function typeAlert() {
+  const el = document.querySelector('.wa-bubble p[lang="mr"]');
+  if (!el) return;
+  const full = el.textContent;
+  if (REDUCED) return;
+  const tag = document.querySelector(".proof .cause-tag");
+  const io = new IntersectionObserver((es) => {
+    if (!es[0].isIntersecting) return;
+    io.disconnect();
+    el.textContent = "";
+    const text = document.createTextNode("");
+    const caret = document.createElement("span");
+    caret.className = "wa-caret";
+    el.append(text, caret);
+    let i = 0;
+    const step = () => {
+      i += 1 + (Math.random() < 0.2 ? 1 : 0);
+      text.textContent = full.slice(0, i);
+      if (i < full.length) setTimeout(step, 16 + Math.random() * 22);
+      else {
+        setTimeout(() => caret.remove(), 1400);
+        if (tag) tag.classList.add("pop-in");
+      }
+    };
+    setTimeout(step, 250);
+  }, { threshold: 0.5 });
+  io.observe(el);
+})();
