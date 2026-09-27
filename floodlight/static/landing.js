@@ -202,29 +202,28 @@ function drawCells(ctx) {
   }));
   const rain = sim.rainNow || 0;
   const base = 0.055 + Math.min(0.115, rain * 0.0042);
-  ctx.save();
-  ctx.beginPath(); ctx.arc(b.cx, b.cy, b.r * 0.9 - 1, 0, 2 * Math.PI); ctx.clip();
-  for (const cl of sim.cells) {
+  for (const cl of sim.cells) {              // weather over the whole sheet
     if (!REDUCED) cl.a += cl.sp / 60;
-    const x = b.cx + Math.cos(cl.a) * cl.rr, y = b.cy + Math.sin(cl.a) * cl.rr;
+    const x = b.cx + Math.cos(cl.a) * cl.rr * 1.5, y = b.cy + Math.sin(cl.a) * cl.rr * 1.4;
     const g = ctx.createRadialGradient(x, y, 0, x, y, cl.R);
     g.addColorStop(0, `rgba(74, 96, 146, ${base})`);
     g.addColorStop(1, "rgba(74, 96, 146, 0)");
     ctx.fillStyle = g;
     ctx.fillRect(x - cl.R, y - cl.R, cl.R * 2, cl.R * 2);
   }
-  ctx.restore();
 }
 
-/* the ward as a nautical chart: contour lines of the flood bowls,
-   computed once from the street geometry and cached offscreen */
+/* the whole stage as a nautical chart sheet: contour lines of the flood
+   bowls edge to edge, graticule ticks and drafted margin notes — computed
+   once from the street geometry and cached offscreen */
 function buildContours() {
   const b = sim.bezel;
   if (!b || !sim.segs.length) { sim.contourCanvas = null; return; }
   const R = b.r * 0.9;
   const cell = Math.max(6, Math.round(R / 44));
-  const x0 = b.cx - R, y0 = b.cy - R;
-  const n = Math.ceil((2 * R) / cell) + 2;
+  const x0 = -cell, y0 = -cell;
+  const nx = Math.ceil((sim.W + 2 * cell) / cell) + 1;
+  const ny = Math.ceil((sim.H + 2 * cell) / cell) + 1;
   const wells = sim.segs.map((s) => ({ x: s.mid[0], y: s.mid[1], w: (s.bowl - 0.92) * 2.4 }))
     .concat(sim.drains.map((d) => ({ x: d.xy[0], y: d.xy[1], w: 0.55 })));
   const f = (x, y) => {
@@ -237,9 +236,9 @@ function buildContours() {
     return v;
   };
   const grid = [];
-  for (let j = 0; j < n; j++) {
+  for (let j = 0; j < ny; j++) {
     const row = [];
-    for (let i = 0; i < n; i++) row.push(f(x0 + i * cell, y0 + j * cell));
+    for (let i = 0; i < nx; i++) row.push(f(x0 + i * cell, y0 + j * cell));
     grid.push(row);
   }
   let mn = Infinity, mx = -Infinity;
@@ -248,8 +247,6 @@ function buildContours() {
   oc.width = sim.canvas.width; oc.height = sim.canvas.height;
   const c2 = oc.getContext("2d");
   c2.setTransform(sim.dpr, 0, 0, sim.dpr, 0, 0);
-  c2.save();
-  c2.beginPath(); c2.arc(b.cx, b.cy, R - 1, 0, 2 * Math.PI); c2.clip();
   c2.lineCap = "round";
   const LV = 12;
   for (let l = 1; l < LV; l++) {
@@ -258,8 +255,8 @@ function buildContours() {
     c2.strokeStyle = `rgba(63, 84, 128, ${major ? 0.36 : 0.21})`;
     c2.lineWidth = major ? 1.2 : 1;
     c2.beginPath();
-    for (let j = 0; j < n - 1; j++) {
-      for (let i = 0; i < n - 1; i++) {
+    for (let j = 0; j < ny - 1; j++) {
+      for (let i = 0; i < nx - 1; i++) {
         const x = x0 + i * cell, y = y0 + j * cell;
         const a = grid[j][i], bb = grid[j][i + 1], cc = grid[j + 1][i + 1], dd = grid[j + 1][i];
         let idx = (a > t ? 8 : 0) | (bb > t ? 4 : 0) | (cc > t ? 2 : 0) | (dd > t ? 1 : 0);
@@ -281,7 +278,28 @@ function buildContours() {
     }
     c2.stroke();
   }
-  c2.restore();
+
+  // graticule — surveyor's crosses on a regular grid, whole sheet
+  const g = 96;
+  c2.strokeStyle = "rgba(63, 84, 128, 0.26)";
+  c2.lineWidth = 1;
+  c2.beginPath();
+  for (let gy = g / 2; gy < sim.H; gy += g) {
+    for (let gx = g / 2; gx < sim.W; gx += g) {
+      c2.moveTo(gx - 4, gy); c2.lineTo(gx + 4, gy);
+      c2.moveTo(gx, gy - 4); c2.lineTo(gx, gy + 4);
+    }
+  }
+  c2.stroke();
+
+  // drafted margin notes — the sheet says what it is
+  c2.fillStyle = "rgba(131, 127, 110, 0.6)";
+  c2.font = '9px "Space Mono", monospace';
+  c2.textAlign = "left"; c2.textBaseline = "top";
+  c2.fillText("1 9 . 0 1 °  N   ·   7 2 . 8 4 °  E", 14, 12);
+  c2.fillText("M M R  C H A R T  ·  W A R D  G / N", 14, 26);
+  c2.textBaseline = "bottom";
+  c2.fillText("H I N D M A T A  B A S I N  ·  B O W L  C O N T O U R S", 14, sim.H - 12);
   sim.contourCanvas = oc;
 }
 
@@ -387,9 +405,9 @@ function drawFrame(fade) {
   const { ctx, W, H } = sim;
   ctx.clearRect(0, 0, W, H);
   const now = performance.now();
-  drawBezel(ctx);
   drawCells(ctx);
   if (sim.contourCanvas) ctx.drawImage(sim.contourCanvas, 0, 0, W, H);
+  drawBezel(ctx);
 
   // flood bloom — the water's heat signature under the street grid,
   // kept inside the bezel like everything the instrument knows
