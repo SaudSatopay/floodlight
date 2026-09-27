@@ -148,6 +148,34 @@ app = FastAPI(title="FLOODLIGHT", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 
+@app.get("/phone")
+async def phone_page() -> FileResponse:
+    """The resident's phone — a demo receiver for street alerts."""
+    return FileResponse(STATIC / "phone.html")
+
+
+@app.get("/api/lan")
+async def lan() -> JSONResponse:
+    """Best-effort LAN addresses so the war room can QR the /phone URL."""
+    import socket
+    ips: list[str] = []
+    try:
+        s_ = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s_.connect(("10.255.255.255", 1))
+        ips.append(s_.getsockname()[0])
+        s_.close()
+    except Exception:
+        pass
+    try:
+        for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+            ip = info[4][0]
+            if not ip.startswith("127.") and ip not in ips:
+                ips.append(ip)
+    except Exception:
+        pass
+    return JSONResponse({"ips": ips, "port": 8737})
+
+
 @app.get("/healthz")
 async def healthz() -> JSONResponse:
     """Deploy health probe (Render/Railway point here)."""

@@ -641,3 +641,20 @@ small { font-size: 0.68em; color: var(--sub); font-weight: 400; }
     scroll-behavior: auto !important;
   }
 }
+
+/* ------------------------------------------- resident phone modal */
+#phone-chip { color: var(--ice); font-weight: 700; cursor: pointer; user-select: none; }
+#phone-chip:hover { color: var(--gold-2); }
+#phone-chip::after { content: " · "; color: var(--faint); font-weight: 400; }
+#phone-modal { position: fixed; inset: 0; z-index: 1400; background: rgba(4, 7, 17, 0.8);
+  display: flex; align-items: center; justify-content: center; }
+.pm-card { background: var(--panel); border: 1px solid var(--hair2); padding: 22px 24px;
+  width: min(360px, 92vw); text-align: center; }
+#pm-qr { display: flex; justify-content: center; margin: 14px 0 10px; }
+#pm-qr svg, #pm-qr img { width: 216px; height: 216px; background: #f4ecdd; padding: 10px;
+  border-radius: 4px; }
+.pm-url { font-family: var(--mono); font-size: 12px; color: var(--gold-2); margin: 4px 0 10px;
+  cursor: pointer; word-break: break-all; }
+.pm-note { font-size: 12px; color: var(--cream-3); line-height: 1.65; margin: 0 0 14px; }
+.pm-note b { color: var(--cream); }
+#pm-close { width: 100%; }
