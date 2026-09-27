@@ -119,6 +119,16 @@ function drawBezel(ctx) {
   ctx.beginPath(); ctx.arc(b.cx, b.cy, b.r, 0, 2 * Math.PI); ctx.stroke();
   ctx.strokeStyle = "rgba(43, 61, 99, 0.55)";                // inner, hairline
   ctx.beginPath(); ctx.arc(b.cx, b.cy, b.r * 0.9, 0, 2 * Math.PI); ctx.stroke();
+  // range rings + crosshair — the instrument's own furniture
+  ctx.strokeStyle = "rgba(43, 61, 99, 0.30)";
+  ctx.beginPath(); ctx.arc(b.cx, b.cy, b.r * 0.6, 0, 2 * Math.PI); ctx.stroke();
+  ctx.strokeStyle = "rgba(43, 61, 99, 0.24)";
+  ctx.beginPath(); ctx.arc(b.cx, b.cy, b.r * 0.3, 0, 2 * Math.PI); ctx.stroke();
+  ctx.strokeStyle = "rgba(43, 61, 99, 0.16)";
+  ctx.beginPath();
+  ctx.moveTo(b.cx - b.r * 0.9, b.cy); ctx.lineTo(b.cx + b.r * 0.9, b.cy);
+  ctx.moveTo(b.cx, b.cy - b.r * 0.9); ctx.lineTo(b.cx, b.cy + b.r * 0.9);
+  ctx.stroke();
   for (let i = 0; i < 24; i++) {                             // tick marks
     const a = (i * Math.PI) / 12;
     const major = i % 3 === 0;
@@ -267,6 +277,30 @@ function drawFrame(fade) {
   const now = performance.now();
   drawBezel(ctx);
 
+  // flood bloom — the water's heat signature under the street grid,
+  // kept inside the bezel like everything the instrument knows
+  const bz = sim.bezel;
+  if (bz) {
+    ctx.save();
+    ctx.beginPath(); ctx.arc(bz.cx, bz.cy, bz.r * 0.9 - 1, 0, 2 * Math.PI); ctx.clip();
+    for (const s of sim.segs) {
+      if (s.depth < 4) continue;
+      const col = s.state === "alert" ? "255, 85, 70" : "255, 180, 59";
+      const rad = 26 + Math.min(64, s.depth * 2.2);
+      const a = 0.10 * fade * Math.min(1, s.depth / 20);
+      const step = Math.max(1, Math.floor(s.pts.length / 4));
+      for (let i = 0; i < s.pts.length; i += step) {
+        const [x, y] = s.pts[i];
+        const g = ctx.createRadialGradient(x, y, 0, x, y, rad);
+        g.addColorStop(0, `rgba(${col}, ${a})`);
+        g.addColorStop(1, `rgba(${col}, 0)`);
+        ctx.fillStyle = g;
+        ctx.fillRect(x - rad, y - rad, rad * 2, rad * 2);
+      }
+    }
+    ctx.restore();
+  }
+
   // streets: casing under, state colour over, marching dashes where water flows
   for (const s of sim.segs) {
     ctx.lineCap = ctx.lineJoin = "round";
@@ -327,10 +361,10 @@ function drawFrame(fade) {
 
 function drawRain(intensity, dt) {
   const { ctx, W, H } = sim;
-  const k = Math.max(0.6, W / 900);          // drop density follows the stage
+  const k = Math.max(0.7, Math.min(2.6, W / 780));   // drop density follows the stage
   const layers = [
-    { arr: sim.drops[0], want: intensity * 2.6 * k, spd: 9,  len: 11, a: 0.28, w: 1.1 },
-    { arr: sim.drops[1], want: intensity * 2.2 * k, spd: 15, len: 18, a: 0.5,  w: 1.6 },
+    { arr: sim.drops[0], want: intensity * 3.1 * k, spd: 9,  len: 13, a: 0.3,  w: 1.1 },
+    { arr: sim.drops[1], want: intensity * 2.6 * k, spd: 15, len: 21, a: 0.55, w: 1.6 },
   ];
   for (const L of layers) {
     while (L.arr.length < L.want) L.arr.push({
