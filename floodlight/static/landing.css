@@ -158,6 +158,7 @@ a { color: inherit; text-decoration: none; }
 .hero-copy {
   grid-row: 1; grid-column: 1;
   align-self: center;
+  min-width: 0;                 /* the grid may shrink this column */
   padding: 48px 40px 42px 0;
   position: relative; z-index: 3;
 }
@@ -185,6 +186,9 @@ a { color: inherit; text-decoration: none; }
   font-size: 15px; line-height: 1.75; color: var(--cream-2); font-weight: 400;
 }
 .hero-ctas { display: flex; gap: 14px; margin-top: 36px; flex-wrap: wrap; }
+/* never wider than the column: long CTAs wrap inside their button
+   instead of poking out of the hero on narrow laptops */
+.hero-ctas .cta { max-width: 100%; white-space: normal; line-height: 1.6; }
 .hero-note { margin: 16px 0 0; font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.1em; color: var(--cream-3); }
 .hero-note a { color: var(--gold); }
 .hero-note a:hover { color: var(--gold-2); }
