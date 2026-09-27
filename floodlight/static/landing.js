@@ -170,7 +170,119 @@ function drawBezel(ctx) {
   ctx.font = '700 11px "Space Mono", monospace';
   ctx.textAlign = "center"; ctx.textBaseline = "middle";
   ctx.fillText("N", b.cx + Math.cos(b.north) * (b.r - 28), b.cy + Math.sin(b.north) * (b.r - 28));
+
+  // the bezel is also the tide gauge: an arc rises with the sea and turns
+  // amber past the ~3 m outfall seal — the storm's second axis, on the dial
+  const tide = sim.tideNow || 0;
+  if (tide > 0.5) {
+    const frac = Math.max(0.02, Math.min(1, (tide - 1) / 3.5));
+    const a0 = -Math.PI / 2, a1 = a0 + frac * 2 * Math.PI;
+    ctx.strokeStyle = "rgba(43, 61, 99, 0.5)";
+    ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(b.cx, b.cy, b.r + 7, 0, 2 * Math.PI); ctx.stroke();
+    ctx.strokeStyle = tide >= 3 ? "rgba(255, 180, 59, 0.85)" : "rgba(168, 216, 232, 0.6)";
+    ctx.beginPath(); ctx.arc(b.cx, b.cy, b.r + 7, a0, a1); ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(b.cx + Math.cos(a1) * (b.r + 7), b.cy + Math.sin(a1) * (b.r + 7), 3, 0, 2 * Math.PI);
+    ctx.fillStyle = tide >= 3 ? "#ffb43b" : "#a8d8e8";
+    ctx.fill();
+  }
   ctx.restore();
+}
+
+/* drifting monsoon cells — the weather itself as a soft moving layer */
+function drawCells(ctx) {
+  const b = sim.bezel;
+  if (!b) return;
+  if (!sim.cells) sim.cells = [0, 1, 2, 3].map((i) => ({
+    a: (i / 4) * 2 * Math.PI + Math.random(),
+    rr: b.r * (0.22 + 0.24 * Math.random()),
+    sp: (0.4 + Math.random() * 0.8) * 0.02 * (i % 2 ? 1 : -1),
+    R: b.r * (0.34 + 0.18 * Math.random()),
+  }));
+  const rain = sim.rainNow || 0;
+  const base = 0.055 + Math.min(0.115, rain * 0.0042);
+  ctx.save();
+  ctx.beginPath(); ctx.arc(b.cx, b.cy, b.r * 0.9 - 1, 0, 2 * Math.PI); ctx.clip();
+  for (const cl of sim.cells) {
+    if (!REDUCED) cl.a += cl.sp / 60;
+    const x = b.cx + Math.cos(cl.a) * cl.rr, y = b.cy + Math.sin(cl.a) * cl.rr;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, cl.R);
+    g.addColorStop(0, `rgba(74, 96, 146, ${base})`);
+    g.addColorStop(1, "rgba(74, 96, 146, 0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(x - cl.R, y - cl.R, cl.R * 2, cl.R * 2);
+  }
+  ctx.restore();
+}
+
+/* the ward as a nautical chart: contour lines of the flood bowls,
+   computed once from the street geometry and cached offscreen */
+function buildContours() {
+  const b = sim.bezel;
+  if (!b || !sim.segs.length) { sim.contourCanvas = null; return; }
+  const R = b.r * 0.9;
+  const cell = Math.max(6, Math.round(R / 44));
+  const x0 = b.cx - R, y0 = b.cy - R;
+  const n = Math.ceil((2 * R) / cell) + 2;
+  const wells = sim.segs.map((s) => ({ x: s.mid[0], y: s.mid[1], w: (s.bowl - 0.92) * 2.4 }))
+    .concat(sim.drains.map((d) => ({ x: d.xy[0], y: d.xy[1], w: 0.55 })));
+  const f = (x, y) => {
+    const dc = Math.hypot(x - b.cx, y - b.cy) / R;
+    let v = dc * dc * 2.0;                       // rim high, basin low
+    for (const w of wells) {
+      const d2 = ((x - w.x) ** 2 + (y - w.y) ** 2) / (R * R * 0.028);
+      v -= w.w * Math.exp(-d2);
+    }
+    return v;
+  };
+  const grid = [];
+  for (let j = 0; j < n; j++) {
+    const row = [];
+    for (let i = 0; i < n; i++) row.push(f(x0 + i * cell, y0 + j * cell));
+    grid.push(row);
+  }
+  let mn = Infinity, mx = -Infinity;
+  for (const row of grid) for (const v of row) { if (v < mn) mn = v; if (v > mx) mx = v; }
+  const oc = document.createElement("canvas");
+  oc.width = sim.canvas.width; oc.height = sim.canvas.height;
+  const c2 = oc.getContext("2d");
+  c2.setTransform(sim.dpr, 0, 0, sim.dpr, 0, 0);
+  c2.save();
+  c2.beginPath(); c2.arc(b.cx, b.cy, R - 1, 0, 2 * Math.PI); c2.clip();
+  c2.lineCap = "round";
+  const LV = 12;
+  for (let l = 1; l < LV; l++) {
+    const t = mn + ((mx - mn) * l) / LV;
+    const major = l % 3 === 0;
+    c2.strokeStyle = `rgba(63, 84, 128, ${major ? 0.36 : 0.21})`;
+    c2.lineWidth = major ? 1.2 : 1;
+    c2.beginPath();
+    for (let j = 0; j < n - 1; j++) {
+      for (let i = 0; i < n - 1; i++) {
+        const x = x0 + i * cell, y = y0 + j * cell;
+        const a = grid[j][i], bb = grid[j][i + 1], cc = grid[j + 1][i + 1], dd = grid[j + 1][i];
+        let idx = (a > t ? 8 : 0) | (bb > t ? 4 : 0) | (cc > t ? 2 : 0) | (dd > t ? 1 : 0);
+        if (idx === 0 || idx === 15) continue;
+        if (idx > 7 && idx !== 10) idx = 15 - idx;
+        const L = (p, q) => (t - p) / (q - p);
+        const T = [x + cell * L(a, bb), y], Rt = [x + cell, y + cell * L(bb, cc)],
+              B = [x + cell * L(dd, cc), y + cell], Lf = [x, y + cell * L(a, dd)];
+        const draw = (p, q) => { c2.moveTo(p[0], p[1]); c2.lineTo(q[0], q[1]); };
+        if (idx === 1) draw(Lf, B);
+        else if (idx === 2) draw(B, Rt);
+        else if (idx === 3) draw(Lf, Rt);
+        else if (idx === 4) draw(T, Rt);
+        else if (idx === 5) { draw(T, Rt); draw(Lf, B); }
+        else if (idx === 6) draw(T, B);
+        else if (idx === 7) draw(Lf, T);
+        else if (idx === 10) { draw(Lf, T); draw(B, Rt); }
+      }
+    }
+    c2.stroke();
+  }
+  c2.restore();
+  sim.contourCanvas = oc;
 }
 
 function buildSim(data) {
@@ -276,6 +388,8 @@ function drawFrame(fade) {
   ctx.clearRect(0, 0, W, H);
   const now = performance.now();
   drawBezel(ctx);
+  drawCells(ctx);
+  if (sim.contourCanvas) ctx.drawImage(sim.contourCanvas, 0, 0, W, H);
 
   // flood bloom — the water's heat signature under the street grid,
   // kept inside the bezel like everything the instrument knows
@@ -417,6 +531,8 @@ function heroLoop(ts) {
   $("hud-clock").textContent = `${hh}:${String(mm).padStart(2, "0")}`;
   $("hud-rain").textContent = running ? w.rainLabel : sim.storm.rain_mm[N - 1];
   $("hud-tide").textContent = w.tide.toFixed(1);
+  sim.tideNow = w.tide;
+  sim.rainNow = running ? w.rain : 0;
 
   drawFrame(fade);
   drawRain(running ? Math.min(30, w.rain * 0.75) * fade : 0, dt);
@@ -451,12 +567,13 @@ async function initHero() {
   if (!data) return;         // hero degrades to type-only — still a page
   sizeCanvas();
   buildSim(data);
+  buildContours();
   if (data.storms_all) drawSparks(data.storms_all);
 
   let rsz;
   addEventListener("resize", () => {
     clearTimeout(rsz);
-    rsz = setTimeout(() => { sizeCanvas(); buildSim(data);
+    rsz = setTimeout(() => { sizeCanvas(); buildSim(data); buildContours();
       for (const s of sim.segs) s.depth = 0; clearChips(); sim.t = 0; }, 180);
   });
 
@@ -467,6 +584,8 @@ async function initHero() {
     $("hud-clock").textContent = "15:45";
     $("hud-rain").textContent = sim.storm.rain_mm[6];
     $("hud-tide").textContent = sim.storm.tide_m[6].toFixed(1);
+    sim.tideNow = sim.storm.tide_m[6];
+    sim.rainNow = 0;
     drawFrame(1);
     return;
   }
