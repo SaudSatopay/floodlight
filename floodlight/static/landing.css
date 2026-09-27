@@ -196,6 +196,10 @@ a { color: inherit; text-decoration: none; }
 #ward-canvas, #chip-layer {
   position: absolute; inset: 0; width: 100%; height: 100%;
 }
+#hero-film {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; z-index: 1; background: #04060d;
+}
 #chip-layer { pointer-events: none; z-index: 2; overflow: hidden; }
 
 #storm-hud {
