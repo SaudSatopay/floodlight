@@ -98,101 +98,58 @@ function project(features, drains, W, H) {
   for (const f of features) for (const [lng, lat] of f.geometry.coordinates) eat2(raw(lat, lng));
   for (const d of drains) eat2(raw(d.lat, d.lng));
   const mx = (xMin + xMax) / 2, my = (yMin + yMax) / 2;
-  // seat the ward inside the bezel: centre right-of-middle (the stage's
-  // left edge fades under the headline), ring sized to the free space
-  const cx = rot ? W * 0.585 : W * 0.5, cy = H * 0.5;
-  const ringR = Math.min(cx, W - cx, cy, H - cy) * 0.94;
-  const s = (ringR - 26) / (0.5 * Math.hypot(xMax - xMin, yMax - yMin));
-  sim.bezel = { cx, cy, r: ringR, north: -Math.PI / 2 + rot };
+  // the storm owns the whole stage: seat the ward in the right zone,
+  // clear of the headline scrim, scaled as large as the sheet allows
+  const zx0 = rot ? W * 0.46 : W * 0.08, zx1 = W * 0.955;
+  const zy0 = H * 0.14, zy1 = H * 0.84;
+  const cx = (zx0 + zx1) / 2, cy = (zy0 + zy1) / 2;
+  const s = 0.92 * Math.min((zx1 - zx0) / (xMax - xMin || 1),
+                            (zy1 - zy0) / (yMax - yMin || 1));
+  sim.focus = { cx, cy, r: Math.min(zx1 - zx0, zy1 - zy0) / 2 };
   return (lat, lng) => {
     const [x, y] = raw(lat, lng);
     return [cx + (x - mx) * s, cy + (y - my) * s];
   };
 }
 
-function drawBezel(ctx) {
-  const b = sim.bezel;
-  if (!b) return;
-  ctx.save();
-  ctx.lineWidth = 1;
-  ctx.strokeStyle = "rgba(138, 106, 44, 0.4)";               // outer, brass
-  ctx.beginPath(); ctx.arc(b.cx, b.cy, b.r, 0, 2 * Math.PI); ctx.stroke();
-  ctx.strokeStyle = "rgba(43, 61, 99, 0.55)";                // inner, hairline
-  ctx.beginPath(); ctx.arc(b.cx, b.cy, b.r * 0.9, 0, 2 * Math.PI); ctx.stroke();
-  // range rings + crosshair — the instrument's own furniture
-  ctx.strokeStyle = "rgba(43, 61, 99, 0.30)";
-  ctx.beginPath(); ctx.arc(b.cx, b.cy, b.r * 0.6, 0, 2 * Math.PI); ctx.stroke();
-  ctx.strokeStyle = "rgba(43, 61, 99, 0.24)";
-  ctx.beginPath(); ctx.arc(b.cx, b.cy, b.r * 0.3, 0, 2 * Math.PI); ctx.stroke();
-  ctx.strokeStyle = "rgba(43, 61, 99, 0.16)";
-  ctx.beginPath();
-  ctx.moveTo(b.cx - b.r * 0.9, b.cy); ctx.lineTo(b.cx + b.r * 0.9, b.cy);
-  ctx.moveTo(b.cx, b.cy - b.r * 0.9); ctx.lineTo(b.cx, b.cy + b.r * 0.9);
-  ctx.stroke();
-  for (let i = 0; i < 24; i++) {                             // tick marks
-    const a = (i * Math.PI) / 12;
-    const major = i % 3 === 0;
-    const r1 = b.r - (major ? 11 : 6);
-    ctx.strokeStyle = `rgba(138, 106, 44, ${major ? 0.45 : 0.28})`;
-    ctx.beginPath();
-    ctx.moveTo(b.cx + Math.cos(a) * r1, b.cy + Math.sin(a) * r1);
-    ctx.lineTo(b.cx + Math.cos(a) * b.r, b.cy + Math.sin(a) * b.r);
-    ctx.stroke();
-  }
-  // radar sweep — a slow brass beam patrolling the ward
-  if (!REDUCED && ctx.createConicGradient) {
-    const a = ((performance.now() / 14000) * 2 * Math.PI) % (2 * Math.PI);
-    ctx.save();
-    ctx.beginPath(); ctx.arc(b.cx, b.cy, b.r * 0.9 - 1, 0, 2 * Math.PI); ctx.clip();
-    const g = ctx.createConicGradient(a - 0.02, b.cx, b.cy);
-    g.addColorStop(0, "rgba(217, 169, 78, 0.11)");
-    g.addColorStop(0.14, "rgba(217, 169, 78, 0)");
-    g.addColorStop(1, "rgba(217, 169, 78, 0)");
-    ctx.fillStyle = g;
-    ctx.fillRect(b.cx - b.r, b.cy - b.r, b.r * 2, b.r * 2);
-    ctx.strokeStyle = "rgba(240, 204, 126, 0.16)";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(b.cx, b.cy);
-    ctx.lineTo(b.cx + Math.cos(a) * b.r * 0.9, b.cy + Math.sin(a) * b.r * 0.9);
-    ctx.stroke();
-    ctx.restore();
-  }
-
-  // honest north: the tick leans exactly as far as the map was rotated
-  ctx.strokeStyle = "rgba(217, 169, 78, 0.75)";
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.moveTo(b.cx + Math.cos(b.north) * (b.r - 16), b.cy + Math.sin(b.north) * (b.r - 16));
-  ctx.lineTo(b.cx + Math.cos(b.north) * (b.r + 4), b.cy + Math.sin(b.north) * (b.r + 4));
-  ctx.stroke();
-  ctx.fillStyle = "rgba(217, 169, 78, 0.85)";
-  ctx.font = '700 11px "Space Mono", monospace';
-  ctx.textAlign = "center"; ctx.textBaseline = "middle";
-  ctx.fillText("N", b.cx + Math.cos(b.north) * (b.r - 28), b.cy + Math.sin(b.north) * (b.r - 28));
-
-  // the bezel is also the tide gauge: an arc rises with the sea and turns
-  // amber past the ~3 m outfall seal — the storm's second axis, on the dial
+/* sea gauge — the tide as a slim column on the sheet's right edge,
+   amber past the ~3 m outfall seal */
+function drawSeaGauge(ctx) {
+  const W = sim.W, H = sim.H;
+  const x = W - 26, y0 = H * 0.2, y1 = H * 0.78, h = y1 - y0;
   const tide = sim.tideNow || 0;
-  if (tide > 0.5) {
-    const frac = Math.max(0.02, Math.min(1, (tide - 1) / 3.5));
-    const a0 = -Math.PI / 2, a1 = a0 + frac * 2 * Math.PI;
-    ctx.strokeStyle = "rgba(43, 61, 99, 0.5)";
-    ctx.lineWidth = 2.5;
-    ctx.beginPath(); ctx.arc(b.cx, b.cy, b.r + 7, 0, 2 * Math.PI); ctx.stroke();
-    ctx.strokeStyle = tide >= 3 ? "rgba(255, 180, 59, 0.85)" : "rgba(168, 216, 232, 0.6)";
-    ctx.beginPath(); ctx.arc(b.cx, b.cy, b.r + 7, a0, a1); ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(b.cx + Math.cos(a1) * (b.r + 7), b.cy + Math.sin(a1) * (b.r + 7), 3, 0, 2 * Math.PI);
-    ctx.fillStyle = tide >= 3 ? "#ffb43b" : "#a8d8e8";
-    ctx.fill();
+  if (tide <= 0.5) return;
+  const frac = Math.max(0, Math.min(1, (tide - 1) / 3.5));
+  ctx.save();
+  ctx.strokeStyle = "rgba(43, 61, 99, 0.6)";
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x, y1); ctx.stroke();
+  ctx.font = '8px "Space Mono", monospace';
+  ctx.textAlign = "right"; ctx.textBaseline = "middle";
+  for (let m = 1; m <= 4; m++) {
+    const ty = y1 - ((m - 1) / 3.5) * h;
+    ctx.strokeStyle = m === 3 ? "rgba(255, 180, 59, 0.85)" : "rgba(43, 61, 99, 0.85)";
+    ctx.beginPath(); ctx.moveTo(x - (m === 3 ? 9 : 5), ty); ctx.lineTo(x + 4, ty); ctx.stroke();
+    ctx.fillStyle = m === 3 ? "rgba(255, 180, 59, 0.8)" : "rgba(131, 127, 110, 0.7)";
+    ctx.fillText(`${m}`, x - 13, ty);
   }
+  const fy = y1 - frac * h;
+  ctx.strokeStyle = tide >= 3 ? "rgba(255, 180, 59, 0.9)" : "rgba(168, 216, 232, 0.75)";
+  ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(x, y1); ctx.lineTo(x, fy); ctx.stroke();
+  ctx.fillStyle = tide >= 3 ? "#ffb43b" : "#a8d8e8";
+  ctx.beginPath(); ctx.arc(x, fy, 3.4, 0, 2 * Math.PI); ctx.fill();
+  ctx.translate(x + 12, (y0 + y1) / 2);
+  ctx.rotate(Math.PI / 2);
+  ctx.textAlign = "center";
+  ctx.fillStyle = tide >= 3 ? "rgba(255, 180, 59, 0.85)" : "rgba(131, 127, 110, 0.75)";
+  ctx.fillText(tide >= 3 ? "S E A · O U T F A L L S   S E A L E D" : "S E A · T I D E   M", 0, 0);
   ctx.restore();
 }
 
 /* drifting monsoon cells — the weather itself as a soft moving layer */
 function drawCells(ctx) {
-  const b = sim.bezel;
+  const b = sim.focus;
   if (!b) return;
   if (!sim.cells) sim.cells = [0, 1, 2, 3].map((i) => ({
     a: (i / 4) * 2 * Math.PI + Math.random(),
@@ -217,7 +174,7 @@ function drawCells(ctx) {
    bowls edge to edge, graticule ticks and drafted margin notes — computed
    once from the street geometry and cached offscreen */
 function buildContours() {
-  const b = sim.bezel;
+  const b = sim.focus;
   if (!b || !sim.segs.length) { sim.contourCanvas = null; return; }
   const R = b.r * 0.9;
   const cell = Math.max(6, Math.round(R / 44));
@@ -292,14 +249,16 @@ function buildContours() {
   }
   c2.stroke();
 
-  // drafted margin notes — the sheet says what it is
+  // drafted margin notes — the sheet says what it is (kept right of the
+  // headline scrim so they stay legible)
+  const nx0 = sim.W * 0.47;
   c2.fillStyle = "rgba(131, 127, 110, 0.6)";
   c2.font = '9px "Space Mono", monospace';
   c2.textAlign = "left"; c2.textBaseline = "top";
-  c2.fillText("1 9 . 0 1 °  N   ·   7 2 . 8 4 °  E", 14, 12);
-  c2.fillText("M M R  C H A R T  ·  W A R D  G / N", 14, 26);
+  c2.fillText("1 9 . 0 1 °  N   ·   7 2 . 8 4 °  E", nx0, 102);
+  c2.fillText("M M R  C H A R T  ·  W A R D  G / N", nx0, 116);
   c2.textBaseline = "bottom";
-  c2.fillText("H I N D M A T A  B A S I N  ·  B O W L  C O N T O U R S", 14, sim.H - 12);
+  c2.fillText("H I N D M A T A  B A S I N  ·  B O W L  C O N T O U R S", nx0, sim.H - 118);
   sim.contourCanvas = oc;
 }
 
@@ -379,7 +338,7 @@ function dropChip(seg, tone, main, small) {
   el.innerHTML = `${main}<small>${small}</small>`;
   // anchor at the street's midpoint, clamped inside the stage, dodging
   // chips already on screen (the Hindmata cluster sits very tight)
-  const x = Math.max(90, Math.min(sim.W - 110, seg.mid[0]));
+  const x = Math.max(sim.W * 0.47 + 80, Math.min(sim.W - 120, seg.mid[0]));
   const yBase = Math.max(56, Math.min(sim.H - 56, seg.mid[1]));
   const cands = [[x, yBase, "up"], [x, yBase, "dn"],
                  [x, yBase - 52, "up"], [x, yBase + 52, "dn"],
@@ -407,30 +366,23 @@ function drawFrame(fade) {
   const now = performance.now();
   drawCells(ctx);
   if (sim.contourCanvas) ctx.drawImage(sim.contourCanvas, 0, 0, W, H);
-  drawBezel(ctx);
+  drawSeaGauge(ctx);
 
-  // flood bloom — the water's heat signature under the street grid,
-  // kept inside the bezel like everything the instrument knows
-  const bz = sim.bezel;
-  if (bz) {
-    ctx.save();
-    ctx.beginPath(); ctx.arc(bz.cx, bz.cy, bz.r * 0.9 - 1, 0, 2 * Math.PI); ctx.clip();
-    for (const s of sim.segs) {
-      if (s.depth < 4) continue;
-      const col = s.state === "alert" ? "255, 85, 70" : "255, 180, 59";
-      const rad = 26 + Math.min(64, s.depth * 2.2);
-      const a = 0.10 * fade * Math.min(1, s.depth / 20);
-      const step = Math.max(1, Math.floor(s.pts.length / 4));
-      for (let i = 0; i < s.pts.length; i += step) {
-        const [x, y] = s.pts[i];
-        const g = ctx.createRadialGradient(x, y, 0, x, y, rad);
-        g.addColorStop(0, `rgba(${col}, ${a})`);
-        g.addColorStop(1, `rgba(${col}, 0)`);
-        ctx.fillStyle = g;
-        ctx.fillRect(x - rad, y - rad, rad * 2, rad * 2);
-      }
+  // flood bloom — the water's heat signature under the street grid
+  for (const s of sim.segs) {
+    if (s.depth < 4) continue;
+    const col = s.state === "alert" ? "255, 85, 70" : "255, 180, 59";
+    const rad = 34 + Math.min(96, s.depth * 2.8);
+    const a = 0.12 * fade * Math.min(1, s.depth / 20);
+    const step = Math.max(1, Math.floor(s.pts.length / 4));
+    for (let i = 0; i < s.pts.length; i += step) {
+      const [x, y] = s.pts[i];
+      const g = ctx.createRadialGradient(x, y, 0, x, y, rad);
+      g.addColorStop(0, `rgba(${col}, ${a})`);
+      g.addColorStop(1, `rgba(${col}, 0)`);
+      ctx.fillStyle = g;
+      ctx.fillRect(x - rad, y - rad, rad * 2, rad * 2);
     }
-    ctx.restore();
   }
 
   // streets: casing under, state colour over, marching dashes where water flows
@@ -441,17 +393,17 @@ function drawFrame(fade) {
       ctx.moveTo(s.pts[0][0], s.pts[0][1]);
       for (let i = 1; i < s.pts.length; i++) ctx.lineTo(s.pts[i][0], s.pts[i][1]);
     };
-    const swell = Math.min(2.2, s.depth / 14);
+    const swell = Math.min(3, s.depth / 11);
     path();
     ctx.strokeStyle = CASING; ctx.globalAlpha = 0.9;
-    ctx.lineWidth = 5.2 + swell; ctx.setLineDash([]); ctx.stroke();
+    ctx.lineWidth = 7.4 + swell * 1.3; ctx.setLineDash([]); ctx.stroke();
 
     const col = COL[s.state];
     path();
     ctx.globalAlpha = fade;
     ctx.strokeStyle = s.state === "ok" ? COL.ok : col;
-    ctx.lineWidth = (s.state === "ok" ? 2.9 : 3.6) + swell;
-    if (s.state === "blocked") { ctx.setLineDash([7, 6]); ctx.lineDashOffset = -(now / 55) % 26; }
+    ctx.lineWidth = (s.state === "ok" ? 4.4 : 5.4) + swell;
+    if (s.state === "blocked") { ctx.setLineDash([9, 8]); ctx.lineDashOffset = -(now / 55) % 34; }
     else ctx.setLineDash([]);
     ctx.stroke();
     ctx.setLineDash([]);
@@ -460,9 +412,9 @@ function drawFrame(fade) {
       path();
       ctx.globalAlpha = 0.75 * fade;
       ctx.strokeStyle = "#dcf3fa";
-      ctx.lineWidth = 1.4;
-      ctx.setLineDash([3, 11]);
-      ctx.lineDashOffset = -(now / 26) % 28;
+      ctx.lineWidth = 1.7;
+      ctx.setLineDash([4, 13]);
+      ctx.lineDashOffset = -(now / 26) % 34;
       ctx.stroke();
       ctx.setLineDash([]);
     }

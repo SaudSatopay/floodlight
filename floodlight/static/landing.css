@@ -137,7 +137,7 @@ a { color: inherit; text-decoration: none; }
   position: relative;
   min-height: 100svh;
   display: grid;
-  grid-template-columns: minmax(440px, 5fr) 6fr;
+  grid-template-columns: minmax(430px, 44%) 1fr;
   grid-template-rows: 1fr auto;
   padding: 90px var(--gutter) 0;
   overflow: hidden;
@@ -146,6 +146,14 @@ a { color: inherit; text-decoration: none; }
     radial-gradient(140% 120% at 50% 50%, transparent 55%, rgba(3, 5, 11, 0.6) 100%),
     radial-gradient(rgba(217, 169, 78, 0.05) 1px, transparent 1.2px);
   background-size: auto, auto, 30px 30px;
+}
+/* the storm fills the whole hero; this scrim keeps the title readable,
+   thinning to nothing over the chart */
+#hero::before {
+  content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background: linear-gradient(90deg,
+    rgba(7, 11, 22, 0.95) 0%, rgba(7, 11, 22, 0.86) 24%,
+    rgba(7, 11, 22, 0.44) 44%, rgba(7, 11, 22, 0) 60%);
 }
 .hero-copy {
   grid-row: 1; grid-column: 1;
@@ -181,23 +189,17 @@ a { color: inherit; text-decoration: none; }
 .hero-note a { color: var(--gold); }
 .hero-note a:hover { color: var(--gold-2); }
 
-/* hero stage — the ward, replaying the real storm */
+/* hero stage — the ward, replaying the real storm, edge to edge */
 .hero-stage {
-  grid-row: 1; grid-column: 2;
-  position: relative;
-  min-height: 520px;
+  position: absolute; inset: 0; z-index: 0;
 }
 #ward-canvas, #chip-layer {
   position: absolute; inset: 0; width: 100%; height: 100%;
 }
 #chip-layer { pointer-events: none; z-index: 2; overflow: hidden; }
-.hero-stage {
-  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 18%);
-  mask-image: linear-gradient(90deg, transparent 0, #000 18%);
-}
 
 #storm-hud {
-  position: absolute; top: 26px; right: 4px; z-index: 3;
+  position: absolute; top: 104px; right: 28px; z-index: 3;
   display: flex; align-items: center; gap: 14px;
   background: rgba(10, 16, 31, 0.92);
   border: 1px solid var(--line-2); border-radius: 0;
@@ -211,7 +213,7 @@ a { color: inherit; text-decoration: none; }
 .hud-cell b { color: var(--gold-2); font-size: 12px; margin: 0 2px; font-variant-numeric: tabular-nums; }
 
 #stage-caption {
-  position: absolute; bottom: 12px; right: 4px; z-index: 3; margin: 0;
+  position: absolute; bottom: 128px; right: 28px; z-index: 3; margin: 0;
   max-width: 330px; text-align: right;
   font-family: var(--mono); font-size: 8.5px; letter-spacing: 0.04em;
   line-height: 1.7; color: var(--cream-3);
@@ -443,6 +445,7 @@ a { color: inherit; text-decoration: none; }
 /* ------------------------------------------------------------------ mobile */
 @media (max-width: 1100px) {
   #hero { grid-template-columns: 1fr; }
+  #hero::before { display: none; }
   .hero-copy { grid-column: 1; padding-right: 0; max-width: 660px; }
   .hero-stage {
     grid-row: 1; grid-column: 1;
@@ -466,6 +469,9 @@ a { color: inherit; text-decoration: none; }
 }
 
 @media (max-width: 640px) {
+  .cta.ghost { white-space: normal; }
+  .cta-now { display: block; margin-top: 5px; }
+  .cta-now::before { margin-left: 0; }
   .nav-links, .nav-tag { display: none; }
   #nav .cta.small { margin-left: auto; }
   #ticker { height: 26px; }
