@@ -737,10 +737,11 @@ function heroFilm() {
   const wide = matchMedia("(min-width: 1101px)").matches;
   const save = navigator.connection && navigator.connection.saveData;
   if (REDUCED || !wide || save) { v.remove(); return; }
-  const chips = $("chip-layer"), hudEl = $("storm-hud");
+  const chips = $("chip-layer"), hudEl = $("storm-hud"), rail = $("film-rail");
   const drop = () => {
     window.__filmActive = false;
     v.remove();
+    if (rail) rail.hidden = true;
     if (chips) chips.style.display = "";
     if (hudEl) hudEl.style.display = "";
     if (!sim.running && sim.storm) { sim.running = true; sim.last = 0; requestAnimationFrame(heroLoop); }
@@ -757,6 +758,39 @@ function heroFilm() {
   if (lastSrc) lastSrc.addEventListener("error", drop);   // no playable source
   const guard = setTimeout(() => { if (!window.__filmActive) drop(); }, 6000);
   v.addEventListener("playing", () => clearTimeout(guard), { once: true });
+
+  // hover-scrub: the cursor drags the storm back and forth across 20 s,
+  // release and the film rolls on — same grammar as the war room chart
+  if (rail && matchMedia("(hover: hover)").matches) {
+    const stage = document.querySelector(".hero-stage");
+    const fill = $("film-rail-fill"), dot = $("film-rail-dot"), hint = $("film-rail-hint");
+    const cl = (x) => Math.max(0, Math.min(0.999, x));
+    let scrubbing = false, raf = 0, targetT = 0;
+    const D = () => v.duration || 20;
+    const setFill = (k) => { fill.style.width = `${k * 100}%`; dot.style.left = `${k * 100}%`; };
+    v.addEventListener("timeupdate", () => { if (!scrubbing) setFill(v.currentTime / D()); });
+    v.addEventListener("playing", () => { rail.hidden = false; }, { once: true });
+    stage.addEventListener("pointerenter", () => {
+      if (!window.__filmActive) return;
+      scrubbing = true; v.pause();
+      hint.textContent = "scrubbing — release to resume";
+    });
+    stage.addEventListener("pointermove", (e) => {
+      if (!scrubbing || !window.__filmActive) return;
+      const r = stage.getBoundingClientRect();
+      targetT = cl((e.clientX - r.left) / r.width) * D();
+      if (!raf) raf = requestAnimationFrame(() => {
+        raf = 0; v.currentTime = targetT; setFill(targetT / D());
+      });
+    });
+    stage.addEventListener("pointerleave", () => {
+      if (!scrubbing) return;
+      scrubbing = false;
+      hint.textContent = "⟷ hover to scrub the storm";
+      if (window.__filmActive) v.play().catch(() => {});
+    });
+  }
+
   const p = v.play();
   if (p && p.catch) p.catch(() => {});    // real failures arrive via error/guard
 }
