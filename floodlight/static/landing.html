@@ -58,11 +58,16 @@
         <a class="cta" href="/app">▶ Open the war room</a>
         <a class="cta ghost" href="/app?watch=1">Where is it flooding right now? →</a>
       </div>
-      <p class="hero-note">live demo · no login · or <a href="/app?tour=1">take the guided tour →</a></p>
+      <p class="hero-note">live demo · no login · <a href="/app?tour=1">take the guided tour →</a> · <a href="/static/brag.mp4" target="_blank" rel="noopener">the 20-second film →</a></p>
     </div>
 
     <div class="hero-stage" aria-hidden="true">
       <canvas id="ward-canvas"></canvas>
+      <video id="hero-film" muted loop playsinline autoplay preload="metadata"
+             poster="/static/brag-hero.jpg" hidden>
+        <source src="/static/brag-hero.mp4" type="video/mp4" />
+        <source src="/static/brag-hero.webm" type="video/webm" />
+      </video>
       <div id="chip-layer"></div>
       <div id="storm-hud" class="bracket">
         <span class="hud-rec" aria-hidden="true"></span>

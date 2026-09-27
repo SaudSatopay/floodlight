@@ -1,0 +1,665 @@
+<!doctype html>
+<!-- FLOODLIGHT launch film — every frame is a pure function of time.
+     Driven frame-by-frame by the capture harness via window.__seek(f).
+     Uses the real Hindmata geometry (/api/landing), the real fonts and
+     the real 08 July 2026 rain/tide curve, compressed to ~20 s. -->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>FLOODLIGHT — launch film</title>
+<link rel="stylesheet" href="/static/vendor/fonts/fonts.css" />
+<style>
+  html, body { margin: 0; background: #04060d; }
+  #stage { width: 1920px; height: 1080px; display: block; }
+</style>
+</head>
+<body>
+<canvas id="stage" width="1920" height="1080"></canvas>
+<script>
+const W = 1920, H = 1080, FPS = 30, DUR = 20.0, FRAMES = DUR * FPS;
+const ctx = document.getElementById("stage").getContext("2d");
+const HERO = new URLSearchParams(location.search).has("hero");   // hero cut: visuals only, the page supplies the words
+
+/* palette — the product's own tokens */
+const BG = "#070b16", BG2 = "#04060d";
+const CREAM = "#f4ecdd", CREAM2 = "#c9c1ad", FAINT = "#837f6e";
+const GOLD = "#d9a94e", GOLD2 = "#f0cc7e", GOLD3 = "#8a6a2c";
+const ICE = "#a8d8e8", RED = "#ff5546", AMBER = "#ffb43b";
+const OK = "#45577d", CASING = "#040711";
+const BLOCKED_ID = "parel-tank-rd";
+
+/* deterministic RNG */
+function mulberry32(a) { return function () {
+  a |= 0; a = (a + 0x6d2b79f5) | 0;
+  let t = Math.imul(a ^ (a >>> 15), 1 | a);
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+
+const lerp = (a, b, k) => a + (b - a) * k;
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const ease = (k) => 1 - Math.pow(1 - clamp(k, 0, 1), 3);
+const easeIO = (k) => { k = clamp(k, 0, 1); return k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2; };
+const back = (k) => { const s = 1.70158; k = clamp(k, 0, 1) - 1; return k * k * ((s + 1) * k + s) + 1; };
+
+/* fit a text run to a width at a given font template ("SIZEpx" marker) */
+function fitSize(text, tpl, maxW, start) {
+  let size = start;
+  ctx.font = tpl.replace("SIZE", size);
+  while (ctx.measureText(text).width > maxW && size > 40) {
+    size -= 4; ctx.font = tpl.replace("SIZE", size);
+  }
+  return size;
+}
+
+/* kinetic word slams: each word lands with scale-overshoot on its beat */
+function slam(words, x, y, size, t, t0, stagger = 0.14, exitT = 1e9) {
+  let cx = x;
+  const exit = t > exitT ? clamp((t - exitT) / 0.4, 0, 1) : 0;
+  for (let i = 0; i < words.length; i++) {
+    const w = words[i];
+    const k = clamp((t - (t0 + i * stagger)) / 0.34, 0, 1);
+    if (k <= 0) { break; }
+    const it = w.it;
+    ctx.font = `${it ? "italic 560" : "620"} ${size}px Fraunces, serif`;
+    const adv = ctx.measureText(w.t).width + size * 0.26;
+    const sc = 1 + 0.22 * (1 - back(k)) + exit * 0.08;
+    ctx.save();
+    ctx.globalAlpha = k * (1 - exit);
+    ctx.translate(cx + adv / 2 - size * 0.13, y);
+    ctx.scale(sc, sc);
+    ctx.fillStyle = w.c || (it ? GOLD2 : CREAM);
+    ctx.fillText(w.t, -(adv / 2 - size * 0.13), 0);
+    ctx.restore();
+    cx += adv;
+  }
+}
+
+/* brass light-sweep across the wordmark */
+const wmOsc = document.createElement("canvas");
+function wordmarkShine(x, y, size, alpha, t, sweepT0) {
+  if (alpha <= 0) return;
+  wmOsc.width = W; wmOsc.height = Math.ceil(size * 1.5);
+  const oc = wmOsc.getContext("2d");
+  oc.clearRect(0, 0, wmOsc.width, wmOsc.height);
+  oc.font = `800 ${size}px Archivo, sans-serif`;
+  oc.textAlign = "left"; oc.textBaseline = "alphabetic";
+  const flood = "F L O O D", light = " L I G H T";
+  oc.fillStyle = CREAM; oc.fillText(flood, x, size * 1.1);
+  oc.fillStyle = GOLD; oc.fillText(light, x + oc.measureText(flood).width, size * 1.1);
+  const sk = (t - sweepT0) / 1.1;
+  if (sk > 0 && sk < 1) {
+    const sx = x - 200 + (oc.measureText(flood + light).width + 400) * sk;
+    const g = oc.createLinearGradient(sx - 130, 0, sx + 130, 0);
+    g.addColorStop(0, "rgba(255,244,214,0)");
+    g.addColorStop(0.5, "rgba(255,248,226,0.9)");
+    g.addColorStop(1, "rgba(255,244,214,0)");
+    oc.globalCompositeOperation = "source-atop";
+    oc.fillStyle = g; oc.fillRect(0, 0, wmOsc.width, wmOsc.height);
+    oc.globalCompositeOperation = "source-over";
+  }
+  ctx.save(); ctx.globalAlpha = alpha;
+  ctx.drawImage(wmOsc, 0, y - size * 1.1);
+  ctx.restore();
+}
+
+/* ---------------------------------------------------------- geometry */
+let segs = [], drains = [], storm = null, contour = null, noiseTile = null;
+let depthsF = null, stateF = null;   // [frame][seg] precomputed hydrology
+
+const FOCUS = { x0: W * 0.44, x1: W * 0.955, y0: H * 0.1, y1: H * 0.92 };
+const ROT = -0.99;
+
+function project(features, drs) {
+  let latMin = 90, latMax = -90, lngMin = 180, lngMax = -180;
+  const eat = (lat, lng) => {
+    latMin = Math.min(latMin, lat); latMax = Math.max(latMax, lat);
+    lngMin = Math.min(lngMin, lng); lngMax = Math.max(lngMax, lng); };
+  for (const f of features) for (const [lng, lat] of f.geometry.coordinates) eat(lat, lng);
+  for (const d of drs) eat(d.lat, d.lng);
+  const kx = Math.cos(((latMin + latMax) / 2) * Math.PI / 180);
+  const cosR = Math.cos(ROT), sinR = Math.sin(ROT);
+  const raw = (lat, lng) => {
+    const x = (lng - lngMin) * kx, y = (latMax - lat);
+    return [x * cosR - y * sinR, x * sinR + y * cosR]; };
+  let xMin = 1e9, xMax = -1e9, yMin = 1e9, yMax = -1e9;
+  const eat2 = ([x, y]) => {
+    xMin = Math.min(xMin, x); xMax = Math.max(xMax, x);
+    yMin = Math.min(yMin, y); yMax = Math.max(yMax, y); };
+  for (const f of features) for (const [lng, lat] of f.geometry.coordinates) eat2(raw(lat, lng));
+  for (const d of drs) eat2(raw(d.lat, d.lng));
+  const mx = (xMin + xMax) / 2, my = (yMin + yMax) / 2;
+  const cx = (FOCUS.x0 + FOCUS.x1) / 2, cy = (FOCUS.y0 + FOCUS.y1) / 2;
+  const s = 0.94 * Math.min((FOCUS.x1 - FOCUS.x0) / (xMax - xMin),
+                            (FOCUS.y1 - FOCUS.y0) / (yMax - yMin));
+  return (lat, lng) => { const [x, y] = raw(lat, lng);
+    return [cx + (x - mx) * s, cy + (y - my) * s]; };
+}
+
+/* storm helpers over the real curve */
+function curve(arr, m) {           // m in minutes, 15-min windows
+  const wf = clamp(m / 15, 0, arr.length - 1.001);
+  const i = Math.floor(wf), k = wf - i;
+  return lerp(arr[i], arr[Math.min(arr.length - 1, i + 1)], k);
+}
+/* film-time → storm minutes (honest compression of the real day) */
+function minuteAt(t) {
+  if (t < 3.8) return 22;
+  if (t < 8.3) return lerp(24, 42, (t - 3.8) / 4.5);
+  if (t < 12.3) return lerp(42, 102, (t - 8.3) / 4.0);
+  if (t < 16.1) return lerp(102, 150, (t - 12.3) / 3.8);
+  return 150;
+}
+function rainAt(t) {
+  const r = curve(storm.rain_mm, minuteAt(t));
+  if (t < 1.0) return r * ease(t / 1.0) * 0.5;
+  if (t > 16.6) return r * clamp(1 - (t - 16.6) / 1.8, 0, 1) * 0.4;
+  return r;
+}
+const tideAt = (t) => curve(storm.tide_m, minuteAt(t));
+
+/* precompute hydrology so any frame is pure */
+function precompute() {
+  depthsF = []; stateF = [];
+  const depth = segs.map(() => 0);
+  const dt = 2.6 / FPS;    // film time is ~2.6× denser than the sim's clock
+  for (let f = 0; f < FRAMES; f++) {
+    const t = f / FPS, rain = rainAt(t), tide = tideAt(t);
+    const lock = clamp((tide - 3.0) / 1.5, 0, 1);
+    segs.forEach((s, i) => {
+      const cap = s.blocked ? 3 : 20 * (1 - 0.5 * lock);
+      const gain = s.blocked ? 0.55 : 0.16 * Math.pow(s.bowl, 1.2);
+      const inflow = Math.max(0, rain - cap) * s.bowl * gain;
+      const outflow = (s.blocked ? 0.9 : 1.6) * (1 - 0.75 * lock);
+      depth[i] = Math.max(0, depth[i] + (inflow - outflow) * dt);
+    });
+    depthsF.push(depth.slice());
+    stateF.push(depth.map((d, i) =>
+      segs[i].blocked ? (d >= 8 ? "blocked" : "ok")
+      : d >= 15 ? "alert" : d >= 8 ? "watch" : "ok"));
+  }
+}
+
+/* contour sheet, cached */
+function buildContour() {
+  const oc = document.createElement("canvas");
+  oc.width = W; oc.height = H;
+  const c2 = oc.getContext("2d");
+  const cx = (FOCUS.x0 + FOCUS.x1) / 2, cy = (FOCUS.y0 + FOCUS.y1) / 2;
+  const R = Math.min(FOCUS.x1 - FOCUS.x0, FOCUS.y1 - FOCUS.y0) / 2 * 0.9;
+  const wells = segs.map((s) => ({ x: s.mid[0], y: s.mid[1], w: (s.bowl - 0.92) * 2.4 }))
+    .concat(drains.map((d) => ({ x: d.xy[0], y: d.xy[1], w: 0.55 })));
+  const f = (x, y) => {
+    const dc = Math.hypot(x - cx, y - cy) / R;
+    let v = dc * dc * 2.0;
+    for (const w of wells) {
+      const d2 = ((x - w.x) ** 2 + (y - w.y) ** 2) / (R * R * 0.028);
+      v -= w.w * Math.exp(-d2);
+    }
+    return v; };
+  const cell = 20, nx = Math.ceil(W / cell) + 2, ny = Math.ceil(H / cell) + 2;
+  const grid = [];
+  for (let j = 0; j < ny; j++) { const row = [];
+    for (let i = 0; i < nx; i++) row.push(f(i * cell - cell / 2, j * cell - cell / 2));
+    grid.push(row); }
+  let mn = 1e9, mx = -1e9;
+  for (const row of grid) for (const v of row) { mn = Math.min(mn, v); mx = Math.max(mx, v); }
+  c2.lineCap = "round";
+  for (let l = 1; l < 12; l++) {
+    const t = mn + ((mx - mn) * l) / 12, major = l % 3 === 0;
+    c2.strokeStyle = `rgba(63,84,128,${major ? 0.4 : 0.22})`;
+    c2.lineWidth = major ? 1.4 : 1;
+    c2.beginPath();
+    for (let j = 0; j < ny - 1; j++) for (let i = 0; i < nx - 1; i++) {
+      const x = i * cell - cell / 2, y = j * cell - cell / 2;
+      const a = grid[j][i], b = grid[j][i + 1], c = grid[j + 1][i + 1], d = grid[j + 1][i];
+      let idx = (a > t ? 8 : 0) | (b > t ? 4 : 0) | (c > t ? 2 : 0) | (d > t ? 1 : 0);
+      if (idx === 0 || idx === 15) continue;
+      if (idx > 7 && idx !== 10) idx = 15 - idx;
+      const L = (p, q) => (t - p) / (q - p);
+      const T = [x + cell * L(a, b), y], Rt = [x + cell, y + cell * L(b, c)],
+            B = [x + cell * L(d, c), y + cell], Lf = [x, y + cell * L(a, d)];
+      const dr = (p, q) => { c2.moveTo(p[0], p[1]); c2.lineTo(q[0], q[1]); };
+      if (idx === 1) dr(Lf, B); else if (idx === 2) dr(B, Rt);
+      else if (idx === 3) dr(Lf, Rt); else if (idx === 4) dr(T, Rt);
+      else if (idx === 5) { dr(T, Rt); dr(Lf, B); } else if (idx === 6) dr(T, B);
+      else if (idx === 7) dr(Lf, T); else if (idx === 10) { dr(Lf, T); dr(B, Rt); }
+    }
+    c2.stroke();
+  }
+  // graticule
+  c2.strokeStyle = "rgba(63,84,128,0.28)"; c2.lineWidth = 1; c2.beginPath();
+  for (let gy = 60; gy < H; gy += 120) for (let gx = 60; gx < W; gx += 120) {
+    c2.moveTo(gx - 5, gy); c2.lineTo(gx + 5, gy);
+    c2.moveTo(gx, gy - 5); c2.lineTo(gx, gy + 5); }
+  c2.stroke();
+  // margin notes
+  c2.fillStyle = "rgba(131,127,110,0.7)";
+  c2.font = '13px "Space Mono", monospace'; c2.textAlign = "left"; c2.textBaseline = "top";
+  c2.fillText("1 9 . 0 1 ° N   ·   7 2 . 8 4 ° E", 28, 24);
+  c2.fillText("M M R   C H A R T   ·   W A R D   G / N", 28, 46);
+  c2.textBaseline = "bottom";
+  c2.fillText("H I N D M A T A   B A S I N   ·   B O W L   C O N T O U R S", 28, H - 24);
+  contour = oc;
+}
+
+function buildNoise() {
+  const oc = document.createElement("canvas");
+  oc.width = 256; oc.height = 256;
+  const c2 = oc.getContext("2d");
+  const img = c2.createImageData(256, 256);
+  const rnd = mulberry32(7);
+  for (let i = 0; i < img.data.length; i += 4) {
+    const v = 200 + rnd() * 55;
+    img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+    img.data[i + 3] = 255;
+  }
+  c2.putImageData(img, 0, 0);
+  noiseTile = oc;
+}
+
+/* ------------------------------------------------------------ layers */
+function drawRain(t, f) {
+  const mm = rainAt(t);
+  if (mm <= 0.1) return;
+  const rnd = mulberry32(f * 7919 + 13);
+  const n = Math.round(clamp(mm, 0, 46) * 7);
+  for (const [count, spd, len, alpha, w] of [[n, 46, 34, 0.32, 2.2], [Math.round(n * 0.7), 30, 20, 0.2, 1.5]]) {
+    ctx.strokeStyle = `rgba(168,214,228,${alpha})`;
+    ctx.lineWidth = w; ctx.beginPath();
+    for (let i = 0; i < count; i++) {
+      const x = rnd() * (W + 200) - 100 + ((t * spd * 18) % 40);
+      const y = ((rnd() * (H + 300)) + t * spd * 60) % (H + 160) - 80;
+      ctx.moveTo(x, y); ctx.lineTo(x - len * 0.3, y + len);
+    }
+    ctx.stroke();
+  }
+}
+
+function drawCellsL(t) {
+  const cx = (FOCUS.x0 + FOCUS.x1) / 2, cy = H / 2;
+  const rain = rainAt(t);
+  const base = 0.06 + clamp(rain * 0.004, 0, 0.12);
+  const defs = [[0.9, 0.35, 0.011], [2.9, 0.52, -0.008], [4.6, 0.42, 0.014], [1.7, 0.6, -0.012]];
+  for (const [a0, rr, sp] of defs) {
+    const a = a0 + t * sp * 6;
+    const x = cx + Math.cos(a) * rr * (FOCUS.x1 - FOCUS.x0) * 0.55;
+    const y = cy + Math.sin(a) * rr * H * 0.4;
+    const R = H * 0.42;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, R);
+    g.addColorStop(0, `rgba(74,96,146,${base})`);
+    g.addColorStop(1, "rgba(74,96,146,0)");
+    ctx.fillStyle = g; ctx.fillRect(x - R, y - R, R * 2, R * 2);
+  }
+}
+
+function drawNetwork(t, f, reveal) {
+  const states = stateF[f], depths = depthsF[f];
+  segs.forEach((s, i) => {
+    const prog = reveal >= 1 ? 1 : ease(clamp(reveal * 1.6 - (i / segs.length) * 0.6, 0, 1));
+    if (prog <= 0.01) return;
+    const st = states[i], d = depths[i];
+    const swell = Math.min(4, d / 9);
+    const path = (frac) => {
+      ctx.beginPath();
+      const upto = Math.max(2, Math.ceil(s.pts.length * frac));
+      ctx.moveTo(s.pts[0][0], s.pts[0][1]);
+      for (let k = 1; k < upto; k++) ctx.lineTo(s.pts[k][0], s.pts[k][1]);
+    };
+    // bloom under wet streets
+    if (d > 4) {
+      const col = st === "alert" ? "255,85,70" : "255,180,59";
+      const rad = 54 + Math.min(175, d * 4.6);
+      const a = 0.18 * clamp(d / 20, 0, 1);
+      const step = Math.max(1, Math.floor(s.pts.length / 4));
+      for (let k = 0; k < s.pts.length; k += step) {
+        const [x, y] = s.pts[k];
+        const g = ctx.createRadialGradient(x, y, 0, x, y, rad);
+        g.addColorStop(0, `rgba(${col},${a})`);
+        g.addColorStop(1, `rgba(${col},0)`);
+        ctx.fillStyle = g; ctx.fillRect(x - rad, y - rad, rad * 2, rad * 2);
+      }
+    }
+    path(prog);
+    ctx.lineCap = ctx.lineJoin = "round";
+    ctx.strokeStyle = CASING; ctx.lineWidth = 12 + swell * 1.6; ctx.stroke();
+    path(prog);
+    ctx.strokeStyle = st === "ok" ? OK : st === "alert" ? RED : AMBER;
+    ctx.lineWidth = (st === "ok" ? 7 : 8.6) + swell;
+    if (st === "blocked") { ctx.setLineDash([14, 12]); ctx.lineDashOffset = -(t * 260) % 52; }
+    ctx.stroke(); ctx.setLineDash([]);
+    if (st === "alert" || st === "blocked") {
+      path(prog);
+      ctx.strokeStyle = "rgba(220,243,250,0.8)";
+      ctx.lineWidth = 2.6; ctx.setLineDash([6, 20]);
+      ctx.lineDashOffset = -(t * 540) % 52;
+      ctx.stroke(); ctx.setLineDash([]);
+    }
+  });
+  for (const d of drains) {
+    ctx.beginPath(); ctx.arc(d.xy[0], d.xy[1], 5, 0, 7);
+    ctx.fillStyle = BG2; ctx.fill();
+    ctx.strokeStyle = "#41527a"; ctx.lineWidth = 2; ctx.stroke();
+  }
+}
+
+function seaGauge(t) {
+  const tide = tideAt(t);
+  const x = W - 66, y0 = H * 0.16, y1 = H * 0.84, h = y1 - y0;
+  const frac = clamp((tide - 1) / 3.5, 0, 1);
+  ctx.strokeStyle = "rgba(43,61,99,0.75)"; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x, y1); ctx.stroke();
+  ctx.font = '13px "Space Mono", monospace';
+  ctx.textAlign = "right"; ctx.textBaseline = "middle";
+  for (let m = 1; m <= 4; m++) {
+    const ty = y1 - ((m - 1) / 3.5) * h;
+    ctx.strokeStyle = m === 3 ? "rgba(255,180,59,0.9)" : "rgba(43,61,99,0.9)";
+    ctx.beginPath(); ctx.moveTo(x - (m === 3 ? 16 : 9), ty); ctx.lineTo(x + 7, ty); ctx.stroke();
+    ctx.fillStyle = m === 3 ? "rgba(255,180,59,0.9)" : "rgba(131,127,110,0.8)";
+    ctx.fillText(String(m), x - 22, ty);
+  }
+  const fy = y1 - frac * h;
+  ctx.strokeStyle = tide >= 3 ? "rgba(255,180,59,0.95)" : "rgba(168,216,232,0.8)";
+  ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.moveTo(x, y1); ctx.lineTo(x, fy); ctx.stroke();
+  ctx.fillStyle = tide >= 3 ? AMBER : ICE;
+  ctx.beginPath(); ctx.arc(x, fy, 6, 0, 7); ctx.fill();
+  ctx.save();
+  ctx.translate(x + 22, (y0 + y1) / 2); ctx.rotate(Math.PI / 2);
+  ctx.textAlign = "center";
+  ctx.fillStyle = tide >= 3 ? "rgba(255,180,59,0.9)" : "rgba(131,127,110,0.8)";
+  ctx.fillText(tide >= 3 ? "S E A · O U T F A L L S   S E A L E D" : "S E A · T I D E   M", 0, 0);
+  ctx.restore();
+}
+
+function hud(t, yTop = 44) {
+  const min = minuteAt(t);
+  const hh = 14 + Math.floor(min / 60), mm = Math.floor(min % 60);
+  const rain = Math.round(rainAt(t)), tide = tideAt(t);
+  const x = W - 460, y = yTop;
+  ctx.fillStyle = "rgba(10,16,31,0.92)";
+  ctx.fillRect(x, y, 396, 64);
+  ctx.strokeStyle = "rgba(43,61,99,1)"; ctx.lineWidth = 1.5;
+  ctx.strokeRect(x, y, 396, 64);
+  ctx.fillStyle = RED; ctx.beginPath(); ctx.arc(x + 30, y + 32, 6, 0, 7); ctx.fill();
+  ctx.fillStyle = CREAM; ctx.font = '620 30px Fraunces, serif';
+  ctx.textAlign = "left"; ctx.textBaseline = "middle";
+  ctx.fillText(`${hh}:${String(mm).padStart(2, "0")}`, x + 52, y + 34);
+  ctx.font = '13px "Space Mono", monospace'; ctx.fillStyle = CREAM2;
+  ctx.fillText(`RAIN ${String(rain).padStart(2, " ")} MM/15MIN`, x + 168, y + 24);
+  ctx.fillText(`TIDE ${tide.toFixed(1)} M`, x + 168, y + 46);
+}
+
+/* chips — the real alert cards, drawn deterministically */
+const CHIPS = [
+  { t0: 8.8,  seg: "hindmata-junction",  tone: RED,   main: "⚠ HINDMATA JUNCTION",   small: "T−30 MIN · 240 PHONES BUZZ" },
+  { t0: 9.8,  seg: "dr-ambedkar-rd",     tone: RED,   main: "⚠ DR AMBEDKAR RD",      small: "T−30 MIN · 186 PHONES BUZZ" },
+  { t0: 10.8, seg: "parel-village-lane", tone: RED,   main: "⚠ PAREL VILLAGE LANE",  small: "T−30 MIN · 66 PHONES BUZZ" },
+  { t0: 13.8, seg: BLOCKED_ID,           tone: AMBER, main: "D-07 · CREW DISPATCHED", small: "CAUSE B · EVIDENCE ATTACHED" },
+];
+function chipAnchor(id) {
+  const s = segs.find((x) => x.id === id) || segs[Math.floor(segs.length / 2)];
+  return s.mid;
+}
+function drawChips(t, until) {
+  ctx.font = '700 17px "Space Mono", monospace';
+  const placed = [];
+  for (const c of CHIPS) {
+    if (t < c.t0 || t > until) continue;
+    const k = ease((t - c.t0) / 0.35);
+    let [x, y] = chipAnchor(c.seg);
+    x = clamp(x, FOCUS.x0 + 150, W - 300); y = clamp(y, 160, H - 140);
+    for (const p of placed) if (Math.abs(p[0] - x) < 300 && Math.abs(p[1] - y) < 90) y = p[1] + 96;
+    placed.push([x, y]);
+    const wMain = ctx.measureText(c.main).width;
+    const wCard = Math.max(wMain, 250) + 40;
+    ctx.save();
+    ctx.globalAlpha = k;
+    ctx.translate(0, (1 - k) * 14);
+    ctx.fillStyle = "rgba(10,16,31,0.96)";
+    ctx.fillRect(x - wCard / 2, y - 74, wCard, 62);
+    ctx.strokeStyle = "rgba(43,61,99,1)"; ctx.lineWidth = 1.5;
+    ctx.strokeRect(x - wCard / 2, y - 74, wCard, 62);
+    ctx.fillStyle = c.tone;
+    ctx.fillRect(x - wCard / 2, y - 74, 4, 62);
+    ctx.fillStyle = CREAM; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+    ctx.fillText(c.main, x - wCard / 2 + 20, y - 48);
+    ctx.font = '13px "Space Mono", monospace'; ctx.fillStyle = CREAM2;
+    ctx.fillText(c.small, x - wCard / 2 + 20, y - 25);
+    ctx.font = '700 17px "Space Mono", monospace';
+    // pop ring
+    if (t - c.t0 < 0.9) {
+      const rk = (t - c.t0) / 0.9;
+      ctx.strokeStyle = c.tone; ctx.globalAlpha = (1 - rk) * 0.8;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(x, y - 6, 10 + rk * 46, 0, 7); ctx.stroke();
+    }
+    ctx.restore();
+  }
+}
+
+/* --------------------------------------------------------- title text */
+function kicker(txt, x, y, alpha) {
+  ctx.save(); ctx.globalAlpha = alpha;
+  ctx.font = '700 15px "Space Mono", monospace';
+  ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = GOLD;
+  ctx.fillText("◆  " + txt.split("").join(" "), x, y);
+  ctx.restore();
+}
+function serifLine(txt, x, y, size, alpha, color = CREAM, italicWords = []) {
+  ctx.save(); ctx.globalAlpha = alpha;
+  ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+  let cx = x;
+  for (const word of txt.split(" ")) {
+    const it = italicWords.includes(word.replace(/[.,]/g, ""));
+    ctx.font = `${it ? "italic 560" : "620"} ${size}px Fraunces, serif`;
+    ctx.fillStyle = it ? GOLD2 : color;
+    ctx.fillText(word, cx, y);
+    cx += ctx.measureText(word).width + size * 0.27;
+  }
+  ctx.restore();
+}
+function wordmark(x, y, size, alpha) {
+  ctx.save(); ctx.globalAlpha = alpha;
+  ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+  ctx.font = `800 ${size}px Archivo, sans-serif`;
+  const flood = "F L O O D", light = " L I G H T";
+  ctx.fillStyle = CREAM; ctx.fillText(flood, x, y);
+  ctx.fillStyle = GOLD; ctx.fillText(light, x + ctx.measureText(flood).width, y);
+  ctx.restore();
+}
+
+/* ------------------------------------------------------------ scenes */
+function fadeRect(a) {
+  if (a <= 0) return;
+  ctx.fillStyle = `rgba(4,6,13,${clamp(a, 0, 1)})`;
+  ctx.fillRect(0, 0, W, H);
+}
+function fadeWhite(a) {
+  if (a <= 0) return;
+  ctx.fillStyle = `rgba(244,236,221,${clamp(a, 0, 1)})`;
+  ctx.fillRect(0, 0, W, H);
+}
+
+function frame(f) {
+  const t = f / FPS;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = BG; ctx.fillRect(0, 0, W, H);
+
+  /* camera: slow push through the storm, a punch on the seal */
+  let cam = 1;
+  if (t >= 4) cam += 0.07 * ease((t - 4) / 9.2);
+  if (t >= 13.2) cam += 0.13 * Math.exp(-(t - 13.2) * 5);
+  if (t >= 16.6) cam = lerp(cam, 1.02, ease((t - 16.6) / 1.0));
+  const fx = W * 0.68, fy = H * 0.38;
+  ctx.save();
+  ctx.translate(fx, fy); ctx.scale(cam, cam); ctx.translate(-fx, -fy);
+
+  const sheetA = t < 3.8 ? ease(t / 3.4) * 0.55 : clamp(0.55 + ease((t - 3.8) / 0.8) * 0.45, 0, 1);
+  drawCellsL(t);
+  ctx.save(); ctx.globalAlpha = sheetA;
+  if (contour) ctx.drawImage(contour, 0, 0);
+  ctx.restore();
+
+  const reveal = t < 3.9 ? 0 : t < 6.1 ? (t - 3.9) / 2.2 : 1;
+  if (t >= 3.9 && t < 16.75) {
+    drawNetwork(t, Math.min(f, FRAMES - 1), reveal);
+    seaGauge(t);
+    drawChips(t, 16.35);
+  }
+  ctx.restore();                                   // camera off for weather + type
+  if (t >= 3.9 && t < 16.75 && t >= 7.9) hud(t, HERO ? 44 : 128);
+  drawRain(t, f);
+
+  /* the seal: amber wash + shockwave off the gauge */
+  if (t >= 13.2 && t < 15.2) {
+    const k = t - 13.2;
+    ctx.fillStyle = `rgba(255,180,59,${0.34 * Math.exp(-k * 4.2)})`;
+    ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = `rgba(255,180,59,${0.55 * Math.exp(-k * 2.6)})`;
+    ctx.lineWidth = 4 + k * 4;
+    ctx.beginPath(); ctx.arc(W - 66, H * 0.5, 30 + k * 1500, 0, 7); ctx.stroke();
+  }
+  /* lightning inside the peak */
+  for (const lt0 of [10.4, 12.1]) {
+    const lk = t - lt0;
+    if (lk > 0 && lk < 0.4)
+      fadeWhite(0.3 * Math.exp(-lk * 9) * (lk < 0.05 ? 0.4 : 1));
+  }
+
+  /* ---- kinetic type (titled cut only) */
+  if (!HERO && t < 4.0) {                                    // S1 — mega hook
+    const aK = ease((t - 0.55) / 0.5) * (t > 3.25 ? clamp(1 - (t - 3.25) / 0.45, 0, 1) : 1);
+    kicker("MUSA CODEX 2026 · HYPERLOCAL FLOOD WARNING", 106, 208, aK * 0.95);
+    ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+    const s1 = fitSize("MUMBAI FLOODS", '620 SIZEpx Fraunces, serif', W * 0.85, 300);
+    slam([{ t: "MUMBAI" }, { t: "FLOODS", it: 1 }], 100, 230 + s1 * 0.78, s1, t, 0.85, 0.3, 3.25);
+    const s2 = Math.round(s1 * 0.44);
+    slam([{ t: "street", it: 1 }, { t: "by", it: 1 }, { t: "street.", it: 1 }],
+      106, 230 + s1 * 0.78 + s2 * 1.15, s2, t, 1.55, 0.17, 3.25);
+  }
+  if (!HERO && t >= 4.55 && t < 8.3) {                        // S2 — shimmer reveal
+    const a = ease((t - 4.55) / 0.5) * (t > 7.85 ? clamp(1 - (t - 7.85) / 0.45, 0, 1) : 1);
+    wordmarkShine(112, H * 0.35, 118, a, t, 5.25);
+    slam([{ t: "Every" }, { t: "street," }, { t: "warned.", it: 1 }],
+      112, H * 0.35 + 152, 82, t, 4.95, 0.13, 7.85);
+    slam([{ t: "Every" }, { t: "drain," }, { t: "diagnosed.", it: 1 }],
+      112, H * 0.35 + 262, 82, t, 5.4, 0.13, 7.85);
+  }
+  if (!HERO && t >= 10.9 && t < 12.65) {                      // S3 — stat slams
+    const rows = [
+      ["12 STREETS WARNED EARLY", 10.9],
+      ["1,195 PEOPLE · 28 MIN HEAD START", 11.35],
+      ["मराठी · हिंदी · ENGLISH — WHATSAPP + IVR", 11.8],
+    ];
+    ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+    rows.forEach(([txt, tt], i) => {
+      let a = ease((t - tt) / 0.3) * clamp(1 - (t - 12.25) / 0.4, 0, 1);
+      if (t - tt < 0.12 && f % 2 === 0) a *= 0.25;             // strike flicker
+      if (a <= 0) return;
+      ctx.save(); ctx.globalAlpha = a;
+      ctx.font = '700 40px "Space Mono", monospace';
+      ctx.fillStyle = i === 1 ? GOLD2 : CREAM;
+      ctx.fillText(txt, 106, H - 250 + i * 62);
+      ctx.restore();
+    });
+  }
+  if (!HERO && t >= 13.3 && t < 15.3) {                       // seal stamp
+    const k = ease((t - 13.3) / 0.35), gone = clamp(1 - (t - 14.9) / 0.4, 0, 1);
+    ctx.save(); ctx.globalAlpha = k * gone;
+    ctx.font = '700 74px "Space Mono", monospace';
+    ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+    const track = 30 - 20 * k;
+    let x = 106;
+    for (const chch of "OUTFALLS SEALED") {
+      ctx.fillStyle = AMBER;
+      ctx.fillText(chch, x, 330);
+      x += ctx.measureText(chch).width + track;
+    }
+    ctx.font = '700 20px "Space Mono", monospace';
+    ctx.fillStyle = "rgba(255,180,59,0.85)";
+    ctx.fillText("T H E   S E A   J U S T   L O C K E D   T H E   D R A I N S", 110, 372);
+    ctx.restore();
+  }
+  if (!HERO && t >= 13.5 && t < 16.35) {                      // S4 — the twist line
+    slam([{ t: "More" }, { t: "water" }, { t: "than" }, { t: "the" },
+          { t: "rain", it: 1 }, { t: "can" }, { t: "explain.", it: 1 }],
+      106, H - 190, 58, t, 13.55, 0.09, 16.0);
+    const aK = ease((t - 14.15) / 0.4) * (t > 16.0 ? clamp(1 - (t - 16.0) / 0.35, 0, 1) : 1);
+    kicker("CAUSE B · THE DRAIN'S CONFESSION", 110, H - 138, aK);
+  }
+  fadeRect(t < 0.4 ? 1 - t / 0.4 : 0);
+  if (t >= 3.5 && t < 4.4) fadeRect((HERO ? 0.35 : 0.63) * Math.sin(((t - 3.5) / 0.9) * Math.PI));
+  if (t >= 16.1 && t < 17.0) fadeRect((HERO ? 0.4 : 0.85) * Math.sin(((t - 16.1) / 0.9) * Math.PI));
+  if (!HERO && t >= 16.8) {                                   // S5 — kinetic outro
+    slam([{ t: "Every" }, { t: "street," }, { t: "warned.", it: 1 }],
+      106, H * 0.3, 104, t, 16.95, 0.14);
+    slam([{ t: "Every" }, { t: "drain," }, { t: "diagnosed.", it: 1 }],
+      106, H * 0.3 + 136, 104, t, 17.5, 0.14);
+    const a2 = ease((t - 18.35) / 0.5);
+    wordmarkShine(108, H * 0.3 + 300, 82, a2, t, 18.55);
+    if (a2 > 0) {
+      ctx.save(); ctx.globalAlpha = a2;
+      ctx.font = '700 23px "Space Mono", monospace';
+      ctx.fillStyle = GOLD2; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+      ctx.fillText("floodlight.onrender.com", 112, H * 0.3 + 354);
+      ctx.font = '700 17px "Space Mono", monospace';
+      ctx.fillStyle = FAINT;
+      ctx.fillText("35 pinned tests · a ₹2,000 sensor · any city on Earth", 112, H * 0.3 + 392);
+      ctx.fillText("it is always raining somewhere — storm watch · earth", 112, H * 0.3 + 422);
+      ctx.restore();
+    }
+  }
+  fadeRect(t > 19.5 ? (t - 19.5) / 0.5 : 0);
+
+  /* letterbox — trailer bars (titled cut only) */
+  if (!HERO) {
+    const bh = 96 * ease((t - 3.6) / 0.6) * (t < 19.0 ? 1 : 1 - ease((t - 19.0) / 0.7));
+    if (bh > 0.5) {
+      ctx.fillStyle = "#02030a";
+      ctx.fillRect(0, 0, W, bh); ctx.fillRect(0, H - bh, W, bh);
+    }
+  }
+
+  // vignette + grain
+  const vg = ctx.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, H * 0.95);
+  vg.addColorStop(0, "rgba(3,5,11,0)");
+  vg.addColorStop(1, "rgba(3,5,11,0.66)");
+  ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
+  if (noiseTile) {
+    const rnd = mulberry32(f * 31 + 7);
+    ctx.save();
+    ctx.globalAlpha = 0.045;
+    ctx.translate(-Math.floor(rnd() * 256), -Math.floor(rnd() * 256));
+    for (let y = 0; y < H + 256; y += 256)
+      for (let x = 0; x < W + 256; x += 256) ctx.drawImage(noiseTile, x, y);
+    ctx.restore();
+  }
+}
+
+/* ------------------------------------------------------------- boot */
+window.__seek = (f) => { frame(clamp(f, 0, FRAMES - 1)); return true; };
+window.__ready = (async () => {
+  const data = await (await fetch("/api/landing")).json();
+  storm = data.storm;
+  const p = project(data.geojson.features, data.drains);
+  segs = data.geojson.features.map((f) => {
+    const pts = f.geometry.coordinates.map(([lng, lat]) => p(lat, lng));
+    return { id: f.properties.id, bowl: f.properties.bowl,
+      blocked: f.properties.id === BLOCKED_ID,
+      pts, mid: pts[Math.floor(pts.length / 2)] };
+  });
+  drains = data.drains.map((d) => ({ ...d, xy: p(d.lat, d.lng) }));
+  buildNoise(); buildContour(); precompute();
+  await document.fonts.load('620 84px Fraunces');
+  await document.fonts.load('italic 560 84px Fraunces');
+  await document.fonts.load('800 88px Archivo');
+  await document.fonts.load('700 17px "Space Mono"');
+  await document.fonts.ready;
+  frame(0);
+  return "ready";
+})();
+</script>
+</body>
+</html>

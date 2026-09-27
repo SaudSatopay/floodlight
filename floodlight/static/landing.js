@@ -469,6 +469,7 @@ function drawRain(intensity, dt) {
 }
 
 function heroLoop(ts) {
+  if (window.__filmActive) { sim.running = false; sim.last = 0; return; }
   if (!sim.running) { sim.last = 0; return; }
   requestAnimationFrame(heroLoop);
   if (!sim.last) { sim.last = ts; return; }
@@ -727,6 +728,40 @@ function drawSparks(storms) {
   document.querySelectorAll(".hs b, .sr-mm").forEach((el) => io.observe(el));
 })();
 
+/* the launch film takes the hero on wide screens; the live canvas sim
+   stays underneath as the fallback for mobile, reduced-motion, blocked
+   autoplay, and any playback error */
+function heroFilm() {
+  const v = $("hero-film");
+  if (!v) return;
+  const wide = matchMedia("(min-width: 1101px)").matches;
+  const save = navigator.connection && navigator.connection.saveData;
+  if (REDUCED || !wide || save) { v.remove(); return; }
+  const chips = $("chip-layer"), hudEl = $("storm-hud");
+  const drop = () => {
+    window.__filmActive = false;
+    v.remove();
+    if (chips) chips.style.display = "";
+    if (hudEl) hudEl.style.display = "";
+    if (!sim.running && sim.storm) { sim.running = true; sim.last = 0; requestAnimationFrame(heroLoop); }
+  };
+  v.hidden = false;
+  v.addEventListener("playing", () => {
+    window.__filmActive = true;
+    if (chips) chips.style.display = "none";
+    if (hudEl) hudEl.style.display = "none";
+    sim.running = false;
+  }, { once: true });
+  v.addEventListener("error", drop);
+  const lastSrc = v.querySelector("source:last-of-type");
+  if (lastSrc) lastSrc.addEventListener("error", drop);   // no playable source
+  const guard = setTimeout(() => { if (!window.__filmActive) drop(); }, 6000);
+  v.addEventListener("playing", () => clearTimeout(guard), { once: true });
+  const p = v.play();
+  if (p && p.catch) p.catch(() => {});    // real failures arrive via error/guard
+}
+
 initHero();
+heroFilm();
 hydrateLive();
 hydrateEarth();
